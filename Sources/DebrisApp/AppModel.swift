@@ -289,6 +289,14 @@ final class AppModel: ObservableObject {
         refresh()
     }
 
+    /// Context-menu "Exclude folder": excludes the containing folder, hiding
+    /// every finding under it.
+    func excludeFolder(_ path: String) {
+        try? exclusions.addFolder(path)
+        lastExclusionBatch = ExclusionBatch(entries: [(path, true)], findingIds: [])
+        refresh()
+    }
+
     func undoNeverTouch() {
         guard let batch = lastExclusionBatch else { return }
         for entry in batch.entries {
