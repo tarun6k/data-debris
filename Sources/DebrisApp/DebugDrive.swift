@@ -1,5 +1,7 @@
 import AppKit
+import DebrisCore
 import Foundation
+import UserNotifications
 
 #if DEBUG
 /// `--drive-clean <marker> [--drive-shots <dir>] [--drive-undo]`
@@ -10,7 +12,73 @@ import Foundation
 /// stage. It calls exactly the methods the buttons call; nothing bypasses
 /// the Review gate (S2).
 extension AppModel {
+    /// `--drive-autoclean setup:HH:MM | status | undo`
+    ///
+    /// The Phase 6 live pass, through the exact methods Screen 8's controls
+    /// call: setup enables Auto Clean with only Logs & crash reports ticked
+    /// and a daily schedule; status prints permission state, delivered
+    /// notifications and the last auto run; undo invokes the notification
+    /// Undo handler on the last run.
+    private func applyAutoCleanDriveIfRequested() {
+        let args = CommandLine.arguments
+        guard let index = args.firstIndex(of: "--drive-autoclean"),
+              args.indices.contains(index + 1) else { return }
+        let command = args[index + 1]
+        showWelcome = false
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if command.hasPrefix("setup:") {
+                let parts = command.dropFirst(6).split(separator: ":").compactMap { Int($0) }
+                guard parts.count == 2 else {
+                    print("DRIVE: bad time, want setup:HH:MM")
+                    NSApp.terminate(nil)
+                    return
+                }
+                let logIds = autoCleanEligibleRuleIds(in: .logs).sorted()
+                updateAutoClean {
+                    $0.enabled = true
+                    $0.enabledRuleIds = logIds
+                    $0.schedule = AutoCleanSchedule(frequency: .daily,
+                                                    hour: parts[0], minute: parts[1])
+                    $0.notify = .always
+                }
+                print("DRIVE: enabled=\(autoCleanConfig.enabled) rules=\(autoCleanConfig.enabledRuleIds)")
+                print("DRIVE: next=\(nextAutoCleanRun.map(Format.runMoment) ?? "none")")
+                // Last: the permission prompt can sit unanswered forever.
+                let granted = await AutoCleanNotifier.requestPermission()
+                print("DRIVE: notification permission granted=\(granted)")
+            } else if command == "status" {
+                let center = UNUserNotificationCenter.current()
+                let auth = await center.notificationSettings().authorizationStatus
+                print("DRIVE: auth=\(auth.rawValue)")
+                for note in await center.deliveredNotifications() {
+                    let content = note.request.content
+                    print("DRIVE: delivered title='\(content.title)' body='\(content.body)' "
+                        + "category=\(content.categoryIdentifier) runId=\(content.userInfo["runId"] ?? "-")")
+                }
+                if let run = lastAutoRun {
+                    print("DRIVE: lastAutoRun id=\(run.id) status=\(run.status) "
+                        + "moved=\(run.movedBytes) disposal=\(run.disposal)")
+                } else {
+                    print("DRIVE: lastAutoRun none")
+                }
+            } else if command == "undo" {
+                if let run = undoableAutoRun {
+                    await NotificationHandler.shared.handle(
+                        actionId: AutoCleanNotifier.undoActionId, runId: run.id)
+                    let after = try? history.run(run.id)
+                    print("DRIVE: undo run \(run.id) — status now \(String(describing: after?.status))")
+                } else {
+                    print("DRIVE: no undoable auto run")
+                }
+            }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            NSApp.terminate(nil)
+        }
+    }
+
     func applyDriveIfRequested() {
+        applyAutoCleanDriveIfRequested()
         let args = CommandLine.arguments
         guard let index = args.firstIndex(of: "--drive-clean"),
               args.indices.contains(index + 1) else { return }
