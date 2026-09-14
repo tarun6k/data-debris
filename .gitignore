@@ -1,5 +1,6 @@
 # Generated Xcode project (XcodeGen owns project.yml)
 *.xcodeproj
+Sources/DebrisApp/Info.plist
 
 # Build output
 build/

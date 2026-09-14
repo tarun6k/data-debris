@@ -694,9 +694,38 @@ final class AppModel: ObservableObject {
             onDone: { [weak self] flow, outcome in self?.purchaseDidFinish(flow, outcome) })
     }
 
-    /// Replaced by the local checkout page + browser hand-off in the checkout
-    /// step of this phase; the coordinator only needs the seam.
+    private var checkoutServer: CheckoutServer?
+
+    /// Serves the bundled Paddle page on 127.0.0.1 and hands it to the default
+    /// browser; the flow polls the worker for the key the webhook will mint.
     func openCheckout(plan: LicensePlan, autoRenew: Bool, reference: String) {
+        let config = LicenseConfig.current
+        guard let priceId = config.priceId(plan: plan, autoRenew: autoRenew),
+              let token = config.paddleClientToken,
+              let template = Bundle.main.url(forResource: "checkout", withExtension: "html")
+                  .flatMap({ try? String(contentsOf: $0, encoding: .utf8) }) else {
+            licenseToast = "Checkout is not configured in this build"
+            // choosePlan is still mid-flight; cancel on the next turn so the
+            // flow's own bookkeeping (waiting step, poll task) exists to cancel.
+            DispatchQueue.main.async { self.purchase?.cancel() }
+            return
+        }
+        let page = CheckoutServer.page(
+            template: template, env: config.paddleEnv, token: token,
+            priceId: priceId, reference: reference, machineId: MachineIdentity.machineId())
+        checkoutServer?.stop()
+        let server = CheckoutServer(html: page)
+        checkoutServer = server
+        server.start { url in
+            DispatchQueue.main.async { NSWorkspace.shared.open(url) }
+        }
+    }
+
+    /// datadebris://checkout-success?ref=… — the browser came back; check for
+    /// the key right now instead of on the next 3 s tick.
+    func handleURL(_ url: URL) {
+        guard url.scheme == "datadebris" else { return }
+        purchase?.checkoutCallbackReceived()
     }
 
     /// Written directly, not via updateAutoClean — acknowledging the privacy
@@ -712,6 +741,8 @@ final class AppModel: ObservableObject {
     private func purchaseDidFinish(_ flow: PurchaseFlow, _ outcome: PurchaseFlow.Outcome) {
         guard purchase === flow else { return }
         purchase = nil
+        checkoutServer?.stop()
+        checkoutServer = nil
         guard case .activated(let payload) = outcome else { return }
         refreshEntitlement()
         entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)

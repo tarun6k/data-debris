@@ -69,6 +69,8 @@ struct DataDebrisApp: App {
                 .environmentObject(model)
                 .frame(minWidth: 960, minHeight: 640)
                 .onAppear { NotificationHandler.shared.model = model }
+                // datadebris://checkout-success — poll for the key right away.
+                .onOpenURL { model.handleURL($0) }
         }
         .commands {
             CommandGroup(after: .newItem) {

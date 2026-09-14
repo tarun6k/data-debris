@@ -52,6 +52,15 @@ targets:
     dependencies:
       - target: DebrisCore
         embed: true
+    # INFOPLIST_KEY_* build settings cannot express the CFBundleURLTypes
+    # array, so the datadebris:// checkout callback lives in a generated
+    # plist that Xcode merges with those settings.
+    info:
+      path: Sources/DebrisApp/Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.tarunkumar.datadebris.checkout
+            CFBundleURLSchemes: [datadebris]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tarunkumar.datadebris

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Data Debris — checkout</title>
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+</head>
+<body style="font-family:-apple-system,system-ui,sans-serif;margin:48px;color:#333">
+  <p>Opening the secure Paddle checkout…</p>
+  <p style="color:#777;font-size:13px">Reference __REFERENCE__ · you can close this tab after paying.</p>
+  <script>
+    Paddle.Environment.set("__ENV__");
+    Paddle.Initialize({ token: "__TOKEN__" });
+    Paddle.Checkout.open({
+      items: [{ priceId: "__PRICE_ID__", quantity: 1 }],
+      customData: { reference: "__REFERENCE__", machineId: "__MACHINE_ID__" },
+      settings: { successUrl: "datadebris://checkout-success?ref=__REFERENCE__" }
+    });
+  </script>
+</body>
+</html>
