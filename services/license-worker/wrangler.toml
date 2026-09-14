@@ -1,0 +1,36 @@
+# Data Debris license service.
+# Top level = local dev/test defaults. Deploys go through the named envs:
+#   wrangler deploy --env sandbox | --env production
+# Secrets (never in this file): PADDLE_API_KEY, PADDLE_WEBHOOK_SECRET,
+# PADDLE_PRICE_*, LICENSE_SIGNING_KEY, RESEND_API_KEY — see README.md.
+name = "datadebris-license"
+main = "src/index.ts"
+compatibility_date = "2025-08-01"
+
+kv_namespaces = [
+  { binding = "LICENSES", id = "local-dev" }
+]
+
+[vars]
+PADDLE_ENV = "sandbox"
+EMAIL_FROM = "Data Debris <license@datadebris.app>"
+
+[env.sandbox]
+name = "datadebris-license-sandbox"
+kv_namespaces = [
+  { binding = "LICENSES", id = "TODO-wrangler-kv-namespace-create" }
+]
+
+[env.sandbox.vars]
+PADDLE_ENV = "sandbox"
+EMAIL_FROM = "Data Debris <license@datadebris.app>"
+
+[env.production]
+name = "datadebris-license-production"
+kv_namespaces = [
+  { binding = "LICENSES", id = "TODO-wrangler-kv-namespace-create" }
+]
+
+[env.production.vars]
+PADDLE_ENV = "production"
+EMAIL_FROM = "Data Debris <license@datadebris.app>"
