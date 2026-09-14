@@ -50,14 +50,14 @@ enum Snapshot {
 
 // @main lives on Main, which routes --auto-clean to the headless runner.
 struct DataDebrisApp: App {
-    @StateObject private var model: AppModel
+    @StateObject private var model = AppModel.live()
     @AppStorage("showInMenuBar") private var showInMenuBar = false
 
     init() {
-        let model = AppModel.live()
-        _model = StateObject(wrappedValue: model)
-        // Before anything else: a notification click may be the launch reason.
-        NotificationHandler.shared.install(model: model)
+        // App.init can run more than once; never create state here (the
+        // @StateObject autoclosure guards AppModel). A duplicate AppModel
+        // re-ran the debug drive and rewrote the LaunchAgent mid-schedule.
+        NotificationHandler.shared.installEarly()
         #if DEBUG
         Snapshot.armIfRequested()
         #endif
@@ -68,6 +68,7 @@ struct DataDebrisApp: App {
             ContentView()
                 .environmentObject(model)
                 .frame(minWidth: 960, minHeight: 640)
+                .onAppear { NotificationHandler.shared.model = model }
         }
         .commands {
             CommandGroup(after: .newItem) {

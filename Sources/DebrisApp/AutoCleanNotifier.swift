@@ -69,11 +69,14 @@ enum AutoCleanNotifier {
 final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationHandler()
 
+    /// Attached once the window exists; nil until then (Undo still works via
+    /// its own HistoryStore, navigation is a no-op).
     @MainActor weak var model: AppModel?
 
-    @MainActor
-    func install(model: AppModel) {
-        self.model = model
+    /// Idempotent and model-free, so it is safe from App.init, which can run
+    /// more than once. The delegate must be set at launch: a notification
+    /// click can be the reason the app is running at all.
+    func installEarly() {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.setNotificationCategories([AutoCleanNotifier.category])
