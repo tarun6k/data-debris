@@ -27,8 +27,10 @@ targets:
     type: framework
     platform: macOS
     sources:
-      - Sources/DebrisCore
-      - path: Resources/catalogue.json
+      - path: Sources/DebrisCore
+        excludes:
+          - "Resources/**"
+      - path: Sources/DebrisCore/Resources/catalogue.json
         buildPhase: resources
     dependencies:
       - package: GRDB

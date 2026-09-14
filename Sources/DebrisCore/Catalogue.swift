@@ -24,11 +24,18 @@ public struct Catalogue: Codable, Equatable, Sendable {
     }
 
     public static func bundled() throws -> Catalogue {
-        guard let url = Bundle(for: BundleToken.self).url(forResource: "catalogue", withExtension: "json") else {
+        #if SWIFT_PACKAGE
+        let bundle = Bundle.module
+        #else
+        let bundle = Bundle(for: BundleToken.self)
+        #endif
+        guard let url = bundle.url(forResource: "catalogue", withExtension: "json") else {
             throw CatalogueError.missingBundledCatalogue
         }
         return try load(from: url)
     }
 }
 
+#if !SWIFT_PACKAGE
 private final class BundleToken {}
+#endif
