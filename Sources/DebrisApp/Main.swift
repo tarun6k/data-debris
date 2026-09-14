@@ -1,5 +1,6 @@
 import AppKit
 import DebrisCore
+import os
 
 /// Entry point. `--auto-clean <reason>` (spawned by a LaunchAgent) runs
 /// headless: no window, no Dock icon — run, notify, quit. An already running
@@ -30,6 +31,14 @@ enum Main {
     }
 
     static func runOnce(reason: AutoCleanReason) async {
+        // Unified log for production; stderr so a plist with StandardErrorPath
+        // (or a terminal run) can capture the outcome too.
+        let logger = Logger(subsystem: "com.tarunkumar.datadebris", category: "autoclean")
+        func log(_ line: String, error: Bool = false) {
+            if error { logger.error("\(line, privacy: .public)") }
+            else { logger.notice("\(line, privacy: .public)") }
+            FileHandle.standardError.write(Data("auto-clean: \(line)\n".utf8))
+        }
         let agents = LaunchAgentManager()
         do {
             let config = AutoCleanConfig.load(from: try AutoCleanConfig.defaultFileURL())
@@ -44,11 +53,15 @@ enum Main {
                 history: try HistoryStore(),
                 exclusions: try? ExclusionStore())
             switch try await runner.run(reason: reason) {
-            case .deferred(_, gaveUp: false):
-                try? agents.installRetry(at: Date().addingTimeInterval(3600))
-            case .deferred(_, gaveUp: true):
+            case .deferred(let why, gaveUp: false):
+                log("deferred: \(why.rawValue), retrying in 1 h")
+                do { try agents.installRetry(at: Date().addingTimeInterval(3600)) }
+                catch { log("retry agent install failed: \(error)", error: true) }
+            case .deferred(let why, gaveUp: true):
+                log("deferred: \(why.rawValue), gave up after 24 h")
                 agents.removeRetry()
             case .completed(let runId, let movedBytes, let itemCount):
+                log("completed: run \(runId), \(movedBytes) bytes, \(itemCount) items")
                 agents.removeRetry()
                 await AutoCleanNotifier.post(runId: runId, movedBytes: movedBytes,
                                              itemCount: itemCount, notify: config.notify)
@@ -58,9 +71,8 @@ enum Main {
                 break
             }
         } catch {
-            // launchd captures stderr in the log; the run stays deferred until
-            // the next schedule.
-            FileHandle.standardError.write(Data("auto-clean: \(error)\n".utf8))
+            // The run stays deferred until the next schedule.
+            log("failed: \(error)", error: true)
         }
     }
 }
