@@ -41,12 +41,15 @@ struct CategoryDetailView: View {
         .onAppear { running = model.runningBundleIds() }
         .overlay(alignment: .bottom) { undoToast }
         .background {
-            // Space = Quick Look, ⌘⏎ = Reveal (macOS 13 has no onKeyPress).
+            // Space = Quick Look, ⌘⏎ = Reveal, ⌘⌫ = toggle tick
+            // (macOS 13 has no onKeyPress).
             Group {
                 Button("") { quickLook() }
                     .keyboardShortcut(.space, modifiers: [])
                 Button("") { revealInFinder() }
                     .keyboardShortcut(.return, modifiers: .command)
+                Button("") { toggleFocusedRows() }
+                    .keyboardShortcut(.delete, modifiers: .command)
             }
             .opacity(0)
             .accessibilityHidden(true)
@@ -274,6 +277,13 @@ struct CategoryDetailView: View {
                 NSWorkspace.shared.activateFileViewerSelecting([finding.url])
             }
         }
+    }
+
+    /// ⌘⌫: flip the tick on the highlighted rows, off the first one's state.
+    private func toggleFocusedRows() {
+        let rows = visible.filter { listSelection.contains($0.id) && $0.isReclaimable }
+        guard let first = rows.first else { return }
+        model.setSelected(rows.map(\.id), !model.selectedIds.contains(first.id))
     }
 
     /// A checkbox click on a multi-selected row checks/unchecks the whole

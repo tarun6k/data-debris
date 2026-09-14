@@ -46,6 +46,14 @@ struct DataDebrisApp: App {
                 Button("Scan Now") { model.startScan() }
                     .keyboardShortcut("r")
                     .disabled(model.isScanning || model.showWelcome)
+                Button("Review Selection…") { model.openReview() }
+                    .disabled(!model.canReview || model.showWelcome || model.cleanFlow != nil)
+            }
+            // The app has no document undo; ⌘Z is "put my files back" (S5).
+            CommandGroup(replacing: .undoRedo) {
+                Button("Undo Last Clean") { model.undoLastClean() }
+                    .keyboardShortcut("z")
+                    .disabled(model.showWelcome || model.lastUndoableRunId == nil)
             }
         }
     }
