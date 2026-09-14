@@ -223,7 +223,7 @@ final class AppModel: ObservableObject {
         cleanedSinceScan = false
         scanStartedAt = Date()
         let runner = ScanRunner(
-            scope: ScanScope(),
+            scope: debugScope ?? ScanScope(),
             catalogue: catalogue,
             store: store,
             exclusions: exclusions)
@@ -246,9 +246,29 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// `--scan-roots a,b,c`: restrict a debug scan to specific folders.
+    private var debugScope: ScanScope? {
+        #if DEBUG
+        guard let index = CommandLine.arguments.firstIndex(of: "--scan-roots"),
+              CommandLine.arguments.indices.contains(index + 1) else { return nil }
+        let roots = CommandLine.arguments[index + 1]
+            .split(separator: ",")
+            .map { URL(fileURLWithPath: (String($0) as NSString).expandingTildeInPath) }
+        return ScanScope(roots: roots)
+        #else
+        return nil
+        #endif
+    }
+
     private func scanFinished() {
         scanPoll = nil
         scanStartedAt = nil
+        #if DEBUG
+        if let dup = session.lastResult?.duplicates {
+            FileHandle.standardError.write(Data(
+                "DUP: groups=\(dup.groups.count) clonePairs=\(dup.clonePairsIgnored) filesHashed=\(dup.filesHashed) bytesHashed=\(dup.bytesHashed) pauseEvents=\(dup.pauseEvents) duration=\(String(format: "%.1f", dup.duration))s\n".utf8))
+        }
+        #endif
         // Next scan's progress bar is determinate against this count.
         // Partial (denied paths) still walked everything it could; only a
         // cancelled scan under-counts.
