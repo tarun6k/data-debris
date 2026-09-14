@@ -87,8 +87,9 @@ final class ScanPipelineTests: XCTestCase {
         XCTAssertFalse(findings.contains { $0.url.path.hasSuffix("system-link") })
 
         // Exactly: generic, chrome, old.log, deriveddata, node_modules,
-        // trash, dataset.bin, link-a, link-b.
-        XCTAssertEqual(findings.count, 9)
+        // trash, dataset.bin, link-a, link-b, plus one duplicate (dataset.bin
+        // and link-a are byte-identical sparse files; one is the keeper).
+        XCTAssertEqual(findings.count, 10)
     }
 
     // MARK: - Reclaimability (S10)
@@ -134,7 +135,11 @@ final class ScanPipelineTests: XCTestCase {
         XCTAssertEqual(totals[.developer]?.count, 2)
         XCTAssertEqual(totals[.trash]?.count, 1)
         XCTAssertEqual(totals[.largeOld]?.count, 1)
-        XCTAssertNil(totals[.duplicates])
+        // dataset.bin and link-a are byte-identical sparse files: one
+        // duplicate finding whose reclaimable bytes are the allocated blocks,
+        // not the 600 MB logical size (S10).
+        XCTAssertEqual(totals[.duplicates]?.count, 1)
+        XCTAssertLessThan(totals[.duplicates]?.bytes ?? .max, 1_000_000)
 
         // Cross-check against the stored findings (allocated bytes, S10).
         let findings = try store.findings(in: result.scanId)

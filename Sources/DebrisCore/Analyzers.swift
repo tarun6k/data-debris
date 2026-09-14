@@ -154,9 +154,3 @@ public final class TrashAnalyzer {
         count += 1
     }
 }
-
-/// Phase 5 adds hashing; until then duplicates come from nowhere.
-public struct DuplicateAnalyzer {
-    public init() {}
-    public func process(_ record: FileRecord) -> Finding? { nil }
-}

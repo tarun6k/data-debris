@@ -3,10 +3,16 @@ import Foundation
 public struct Thresholds: Equatable, Sendable {
     public var largeFileBytes: Int64
     public var oldDays: Int
+    public var duplicateMinBytes: Int64
 
-    public init(largeFileBytes: Int64 = 500_000_000, oldDays: Int = 180) {
+    public init(
+        largeFileBytes: Int64 = 500_000_000,
+        oldDays: Int = 180,
+        duplicateMinBytes: Int64 = 1_000_000
+    ) {
         self.largeFileBytes = largeFileBytes
         self.oldDays = oldDays
+        self.duplicateMinBytes = duplicateMinBytes
     }
 }
 
