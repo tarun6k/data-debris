@@ -122,7 +122,7 @@ Journal writes the plan to History as *pending*; Executor re-verifies each item,
 
 ### Data
 
- ~/Library/Application Support/MacCleaner/
+ ~/Library/Application Support/DataDebris/
  history.sqlite runs, items, restore state (WAL mode)
  findings.sqlite last scan snapshot
  catalogue.json current rule set (bundled copy as fallback)
