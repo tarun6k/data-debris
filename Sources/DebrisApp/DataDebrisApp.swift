@@ -51,6 +51,7 @@ enum Snapshot {
 // @main lives on Main, which routes --auto-clean to the headless runner.
 struct DataDebrisApp: App {
     @StateObject private var model: AppModel
+    @AppStorage("showInMenuBar") private var showInMenuBar = false
 
     init() {
         let model = AppModel.live()
@@ -63,7 +64,7 @@ struct DataDebrisApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Data Debris") {
+        WindowGroup("Data Debris", id: "main") {
             ContentView()
                 .environmentObject(model)
                 .frame(minWidth: 960, minHeight: 640)
@@ -82,6 +83,15 @@ struct DataDebrisApp: App {
                     .keyboardShortcut("z")
                     .disabled(model.showWelcome || model.lastUndoableRunId == nil)
             }
+        }
+
+        // Screen 11 — off unless Settings > General turns it on.
+        MenuBarExtra(isInserted: $showInMenuBar) {
+            MenuBarContent()
+                .environmentObject(model)
+        } label: {
+            Image(systemName: model.menuBarLowSpace ? "gauge.low" : "gauge.medium")
+                .foregroundStyle(model.menuBarLowSpace ? Color.orange : Color.primary)
         }
     }
 }

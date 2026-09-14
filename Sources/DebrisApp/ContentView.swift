@@ -89,21 +89,12 @@ struct ContentView: View {
             }
         case .duplicates:
             DuplicatesView()
+        case .autoClean:
+            AutoCleanView()
         case .history:
             HistoryView()
-        default:
-            PlaceholderDetailView(item: model.sidebar ?? .home)
+        case .settings:
+            SettingsView()
         }
-    }
-}
-
-struct PlaceholderDetailView: View {
-    let item: SidebarItem
-
-    var body: some View {
-        Text(item.title)
-            .font(.largeTitle.weight(.semibold))
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle(item.title)
     }
 }

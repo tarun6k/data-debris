@@ -180,24 +180,27 @@ struct HomeView: View {
     // MARK: - Cards
 
     private var autoCleanCard: some View {
-        card(icon: "clock") {
+        let on = model.autoCleanConfig.enabled
+        return card(icon: "clock") {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text("Auto Clean")
                         .font(.system(size: 13, weight: .semibold))
-                    Text("Off")
+                    Text(on ? "On" : "Off")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(on ? Theme.teal : Color.secondary)
                         .padding(.horizontal, 8)
                         .frame(height: 18)
-                        .background(.secondary.opacity(0.16), in: Capsule())
+                        .background((on ? Theme.teal : Color.secondary).opacity(0.16), in: Capsule())
                 }
-                Text("Not scheduled")
+                Text(model.autoCleanStatusLine)
                     .font(.system(size: 12))
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
         } trailing: {
-            EmptyView() // Edit link arrives with Auto Clean (Phase 6)
+            Button("Edit") { model.sidebar = .autoClean }
+                .buttonStyle(.link)
         }
     }
 

@@ -49,6 +49,17 @@ enum Format {
         if Date().timeIntervalSince(date) < 7 * 86_400 { return relative(date) }
         return date.formatted(.dateTime.month(.abbreviated).day())
     }
+
+    /// "Sun 20 Sep, 03:00" — the next/last Auto Clean run.
+    static func runMoment(_ date: Date) -> String {
+        date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+            + ", " + date.formatted(date: .omitted, time: .shortened)
+    }
+
+    /// "6 Sep"
+    static func dayMonth(_ date: Date) -> String {
+        date.formatted(.dateTime.day().month(.abbreviated))
+    }
 }
 
 // MARK: - Display names for engine enums

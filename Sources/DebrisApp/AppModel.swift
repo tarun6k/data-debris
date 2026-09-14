@@ -25,7 +25,9 @@ final class AppModel: ObservableObject {
     let history: HistoryStore
     let exclusions: ExclusionStore
     let session = ScanSession()
-    private let catalogue: Catalogue
+    let catalogue: Catalogue
+    private let autoCleanConfigURL: URL?
+    private let launchAgents: LaunchAgentManager
 
     @Published var sidebar: SidebarItem? = .home
     @Published var openCategory: Category?
@@ -59,6 +61,13 @@ final class AppModel: ObservableObject {
     struct KeeperBatch { let previousKeepers: [String: String] } // group hash → keeper id
     @Published var lastKeeperBatch: KeeperBatch?
 
+    @Published private(set) var autoCleanConfig = AutoCleanConfig()
+    /// The most recent Auto Clean that actually moved files (not .skipped).
+    @Published private(set) var lastAutoRun: RunRecord?
+    @Published private(set) var autoCleanRunning = false
+    /// Outcome line under "Run now" ("Moved 120 MB to Trash · 34 items").
+    @Published private(set) var autoCleanLastOutcome: String?
+
     let home = FileManager.default.homeDirectoryForCurrentUser
 
     private var cancellables: Set<AnyCancellable> = []
@@ -67,11 +76,18 @@ final class AppModel: ObservableObject {
     private static let welcomeCompletedKey = "welcomeCompleted"
     private static let fdaWasGrantedKey = "fdaWasGranted"
 
-    init(store: FindingsStore, history: HistoryStore, exclusions: ExclusionStore, catalogue: Catalogue) {
+    init(store: FindingsStore, history: HistoryStore, exclusions: ExclusionStore,
+         catalogue: Catalogue, autoCleanConfigURL: URL? = nil,
+         launchAgents: LaunchAgentManager? = nil) {
         self.store = store
         self.history = history
         self.exclusions = exclusions
         self.catalogue = catalogue
+        self.autoCleanConfigURL = autoCleanConfigURL ?? (try? AutoCleanConfig.defaultFileURL())
+        self.launchAgents = launchAgents ?? LaunchAgentManager()
+        if let url = self.autoCleanConfigURL {
+            autoCleanConfig = AutoCleanConfig.load(from: url).validated(against: catalogue)
+        }
 
         let defaults = UserDefaults.standard
         // First launch, or FDA revoked after we once saw it granted.
@@ -113,6 +129,13 @@ final class AppModel: ObservableObject {
                 catalogue: try Catalogue.bundled())
             _ = try? model.history.recoverInterruptedRuns()
             _ = try? model.history.pruneExpiredRuns(olderThanDays: Self.historyRetentionDays)
+            // The agent points at the binary by absolute path; heal it if the
+            // bundle moved. Only here — tests must never touch launchctl.
+            if model.autoCleanConfig.enabled {
+                try? LaunchAgentManager().repairIfMoved(
+                    schedule: model.autoCleanConfig.schedule,
+                    lowSpaceTrigger: model.autoCleanConfig.lowSpaceTriggerGB != nil)
+            }
             return model
         } catch {
             fatalError("Cannot open the app's data folder: \(error)")
@@ -199,6 +222,9 @@ final class AppModel: ObservableObject {
         selectedBytes = selected.0
         selectedCount = selected.1
         recentRuns = Array(((try? history.runs()) ?? []).prefix(2))
+        lastAutoRun = ((try? history.runs()) ?? []).first {
+            $0.mode == .auto && $0.status != .skipped && $0.finishedAt != nil
+        }
     }
 
     func refreshDisk() {
@@ -223,6 +249,131 @@ final class AppModel: ObservableObject {
         UserDefaults.standard.set(true, forKey: Self.welcomeCompletedKey)
         recheckFDA()
         showWelcome = false
+    }
+
+    // MARK: - Auto Clean
+
+    /// Categories with at least one eligible rule — the only ones Screen 8
+    /// offers. Duplicates, Large & old and Trash never appear here.
+    var autoCleanCategories: [Category] {
+        Category.allCases.filter { !autoCleanEligibleRuleIds(in: $0).isEmpty }
+    }
+
+    func autoCleanEligibleRuleIds(in category: Category) -> Set<String> {
+        Set(catalogue.rules.filter { $0.category == category && $0.autoCleanEligible }.map(\.id))
+    }
+
+    func autoCleanState(for category: Category) -> CategoryState {
+        let eligible = autoCleanEligibleRuleIds(in: category)
+        let ticked = eligible.intersection(autoCleanConfig.enabledRuleIds)
+        if ticked.isEmpty { return .none }
+        return ticked == eligible ? .all : .some
+    }
+
+    func toggleAutoCleanCategory(_ category: Category) {
+        let eligible = autoCleanEligibleRuleIds(in: category)
+        updateAutoClean { config in
+            var ids = Set(config.enabledRuleIds)
+            if eligible.isSubset(of: ids) { ids.subtract(eligible) } else { ids.formUnion(eligible) }
+            config.enabledRuleIds = ids.sorted()
+        }
+    }
+
+    /// Every config change funnels through here: validate (S9 — ineligible
+    /// ids are stripped), publish, persist, and keep the LaunchAgents in
+    /// step. Reinstalling on each change is a bootout+bootstrap pair; cheap.
+    func updateAutoClean(_ change: (inout AutoCleanConfig) -> Void) {
+        var config = autoCleanConfig
+        change(&config)
+        config = config.validated(against: catalogue)
+        autoCleanConfig = config
+        if let url = autoCleanConfigURL { try? config.save(to: url) }
+        if config.enabled {
+            try? launchAgents.install(schedule: config.schedule,
+                                      lowSpaceTrigger: config.lowSpaceTriggerGB != nil)
+        } else {
+            launchAgents.uninstall()
+        }
+    }
+
+    func setAutoCleanEnabled(_ on: Bool) {
+        updateAutoClean { $0.enabled = on }
+    }
+
+    var nextAutoCleanRun: Date? {
+        guard autoCleanConfig.enabled else { return nil }
+        let schedule = autoCleanConfig.schedule
+        var match = DateComponents(hour: schedule.hour, minute: schedule.minute)
+        switch schedule.frequency {
+        case .daily: break
+        case .weekly: match.weekday = schedule.weekday
+        case .monthly: match.day = 1 // the agent plist also runs on the 1st
+        }
+        return Calendar.current.nextDate(after: Date(), matching: match,
+                                         matchingPolicy: .nextTime)
+    }
+
+    /// "Next run Sun 20 Sep, 03:00 · Last run 6 Sep, 1.9 GB" — Screen 8 and
+    /// the Home card share it.
+    var autoCleanStatusLine: String {
+        guard autoCleanConfig.enabled else { return "Not scheduled" }
+        var parts: [String] = []
+        if let next = nextAutoCleanRun { parts.append("Next run \(Format.runMoment(next))") }
+        if let run = lastAutoRun, let finished = run.finishedAt {
+            parts.append("Last run \(Format.dayMonth(finished)), \(Format.bytes(run.movedBytes))")
+        }
+        return parts.isEmpty ? "On" : parts.joined(separator: " · ")
+    }
+
+    /// Menu bar gauge: amber below the user's low-space trigger, or below
+    /// 10 % free when no trigger is set.
+    var menuBarLowSpace: Bool {
+        let (free, total) = DiskUsage.freeAndTotal()
+        guard total > 0 else { return false }
+        if let gb = autoCleanConfig.lowSpaceTriggerGB {
+            return free < Int64(gb) * 1_000_000_000
+        }
+        return Double(free) / Double(total) < 0.10
+    }
+
+    /// Menu bar: "Auto Clean ran · 1.9 GB · Undo" for 24 h after a run.
+    var undoableAutoRun: RunRecord? {
+        guard let run = lastAutoRun, run.status == .completed,
+              let finished = run.finishedAt,
+              Date().timeIntervalSince(finished) <= 24 * 3600 else { return nil }
+        return run
+    }
+
+    /// "Run now": same engine and preconditions, still Trash-only (S3).
+    func runAutoCleanNow() {
+        guard !autoCleanRunning else { return }
+        autoCleanRunning = true
+        autoCleanLastOutcome = nil
+        let config = autoCleanConfig
+        Task {
+            let line: String
+            do {
+                let runner = try AutoCleanRunner(config: config, catalogue: catalogue,
+                                                 history: history, exclusions: exclusions)
+                switch try await runner.run(reason: .manual) {
+                case .completed(let runId, let movedBytes, let itemCount):
+                    line = "Moved \(Format.bytes(movedBytes)) to Trash · "
+                        + "\(Format.count(itemCount)) \(itemCount == 1 ? "item" : "items")"
+                    await AutoCleanNotifier.post(runId: runId, movedBytes: movedBytes,
+                                                 itemCount: itemCount, notify: config.notify)
+                case .deferred(let reason, _):
+                    line = "Skipped: \(reason.displayText)"
+                case .notNeeded:
+                    line = "Nothing to do"
+                }
+            } catch {
+                line = "Could not run: \(error.localizedDescription)"
+            }
+            autoCleanLastOutcome = line
+            autoCleanRunning = false
+            refresh()
+            refreshDisk()
+        }
     }
 
     // MARK: - Scanning
