@@ -87,6 +87,8 @@ struct ContentView: View {
             } else {
                 ResultsView()
             }
+        case .history:
+            HistoryView()
         default:
             PlaceholderDetailView(item: model.sidebar ?? .home)
         }
