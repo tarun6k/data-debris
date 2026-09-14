@@ -77,6 +77,9 @@ final class AppModel: ObservableObject {
 
         refresh()
         applyDebugRoute()
+        #if DEBUG
+        applyDriveIfRequested()
+        #endif
     }
 
     static func live() -> AppModel {

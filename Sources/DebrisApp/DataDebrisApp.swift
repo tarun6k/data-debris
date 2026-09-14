@@ -4,6 +4,20 @@ import SwiftUI
 /// `--snapshot <path> <delaySeconds>`: writes a PNG of the window via
 /// cacheDisplay (no Screen Recording permission needed). Screenshots only.
 enum Snapshot {
+    /// Captures the sheet when one is up, otherwise the main window.
+    /// Returns false when no visible window exists yet.
+    @discardableResult
+    static func capture(to path: String) -> Bool {
+        let window = NSApp.windows.first { $0.isVisible && $0.sheetParent != nil }
+            ?? NSApp.windows.first { $0.isVisible }
+        guard let frame = window?.contentView?.superview,
+              let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { return false }
+        frame.cacheDisplay(in: frame.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?
+            .write(to: URL(fileURLWithPath: path))
+        return true
+    }
+
     static func armIfRequested() {
         let args = CommandLine.arguments
         guard let index = args.firstIndex(of: "--snapshot"), args.indices.contains(index + 1) else { return }
@@ -13,14 +27,20 @@ enum Snapshot {
             NSApp.activate(ignoringOtherApps: true) // active-window chrome
             if args.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            guard let window = NSApp.windows.first(where: { $0.isVisible }),
-                  let frame = window.contentView?.superview,
-                  let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { return }
-            frame.cacheDisplay(in: frame.bounds, to: rep)
-            try? rep.representation(using: .png, properties: [:])?
-                .write(to: URL(fileURLWithPath: path))
+        // The window can lag launch when the app starts unfocused; retry until
+        // one is up rather than racing it with a fixed delay.
+        var attempts = 0
+        func tryCapture() {
+            attempts += 1
+            if capture(to: path) {
+                FileHandle.standardError.write(Data("SNAPSHOT: written after \(attempts) attempts\n".utf8))
+            } else if attempts < 20 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { tryCapture() }
+            } else {
+                FileHandle.standardError.write(Data("SNAPSHOT: gave up — no visible window\n".utf8))
+            }
         }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { tryCapture() }
     }
 }
 #endif
