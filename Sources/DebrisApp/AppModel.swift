@@ -216,7 +216,9 @@ final class AppModel: ObservableObject {
         scanPoll = nil
         scanStartedAt = nil
         // Next scan's progress bar is determinate against this count.
-        if let result = session.lastResult, result.status == .complete {
+        // Partial (denied paths) still walked everything it could; only a
+        // cancelled scan under-counts.
+        if let result = session.lastResult, result.status != .cancelled {
             UserDefaults.standard.set(result.recordCount, forKey: "lastScanRecordCount")
         }
         refresh()

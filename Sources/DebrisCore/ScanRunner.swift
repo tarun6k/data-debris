@@ -97,7 +97,8 @@ public final class ScanRunner: @unchecked Sendable {
                 if !claimed, let large = largeOld.process(record, now: now) {
                     take([large])
                 }
-                if batch.count >= 500 { try flush() }
+                // Periodic flush so the UI's live category totals fill in.
+                if batch.count >= 500 || (!batch.isEmpty && recordCount % 2000 == 0) { try flush() }
                 if !findings.isEmpty || recordCount % 100 == 0 {
                     onProgress?(ScanProgress(
                         currentPath: currentPath, recordCount: recordCount,

@@ -5,7 +5,15 @@ import DebrisCore
 /// access. Never blocks on FDA; "Continue with limited access" always works.
 struct WelcomeView: View {
     @EnvironmentObject var model: AppModel
-    @State private var step = 0
+    @State private var step: Int = {
+        #if DEBUG // --step 2 for screenshots
+        if let index = CommandLine.arguments.firstIndex(of: "--step"),
+           CommandLine.arguments.indices.contains(index + 1) {
+            return Int(CommandLine.arguments[index + 1]) ?? 0
+        }
+        #endif
+        return 0
+    }()
     @State private var declinedMove = false
 
     private let fdaPoll = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
