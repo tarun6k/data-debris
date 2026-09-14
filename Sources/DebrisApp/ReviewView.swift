@@ -10,7 +10,7 @@ struct CleanSheet: View {
             switch flow.stage {
             case .review: ReviewView(flow: flow)
             case .cleaning: CleaningView(flow: flow)
-            case .done: CleaningView(flow: flow) // DoneView lands next
+            case .done: DoneView(flow: flow)
             }
         }
         .frame(width: 700, height: 540)

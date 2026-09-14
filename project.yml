@@ -55,6 +55,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        # "Empty Trash" asks Finder to do it, so Finder shows its own progress.
+        INFOPLIST_KEY_NSAppleEventsUsageDescription: "Data Debris asks Finder to empty the Trash when you choose Empty Trash. Nothing else is automated."
 
   # Hosted in the app: the standalone xctest agent fails to load unhosted
   # ad-hoc-signed bundles under this Xcode beta ("executable couldn't be located").
