@@ -1,0 +1,19 @@
+# Generated Xcode project (XcodeGen owns project.yml)
+*.xcodeproj
+
+# Build output
+build/
+DerivedData/
+.build/
+.swiftpm/
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+
+# Secrets
+.env
+.env.*
+
+# macOS
+.DS_Store

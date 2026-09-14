@@ -1,0 +1,85 @@
+name: DataDebris
+
+options:
+  bundleIdPrefix: com.tarunkumar
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "13.0"
+
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.0.0
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_APP_SANDBOX: NO
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    GENERATE_INFOPLIST_FILE: YES
+
+targets:
+  DebrisCore:
+    type: framework
+    platform: macOS
+    sources:
+      - Sources/DebrisCore
+    dependencies:
+      - package: GRDB
+        product: GRDB
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tarunkumar.datadebris.core
+        GENERATE_INFOPLIST_FILE: YES
+
+  DataDebris:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/DebrisApp
+    dependencies:
+      - target: DebrisCore
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tarunkumar.datadebris
+        PRODUCT_NAME: DataDebris
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+
+  # Hosted in the app: the standalone xctest agent fails to load unhosted
+  # ad-hoc-signed bundles under this Xcode beta ("executable couldn't be located").
+  DebrisCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/DebrisCoreTests
+    dependencies:
+      - target: DebrisCore
+      - target: DataDebris
+
+  DebrisAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/DebrisAppTests
+    dependencies:
+      - target: DataDebris
+
+schemes:
+  DataDebris:
+    build:
+      targets:
+        DataDebris: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - DebrisCoreTests
+        - DebrisAppTests
