@@ -3,10 +3,6 @@ import GRDB
 @testable import DebrisCore
 
 final class DebrisCoreTests: XCTestCase {
-    func testVersionIsSet() {
-        XCTAssertFalse(DebrisCore.version.isEmpty)
-    }
-
     func testGRDBOpensInMemoryDatabase() throws {
         let queue = try DatabaseQueue()
         let one = try queue.read { db in

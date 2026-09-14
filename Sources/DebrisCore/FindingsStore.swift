@@ -205,6 +205,16 @@ public final class FindingsStore: @unchecked Sendable { // DatabasePool is threa
         }
     }
 
+    /// Bulk read for the UI: every selected finding id in one query.
+    public func selectedFindingIds(in scanId: Int64) throws -> Set<String> {
+        try pool.read { db in
+            Set(try String.fetchAll(db, sql: """
+                SELECT f.id FROM findings f JOIN selection s ON s.findingId = f.id
+                WHERE f.scanId = ? AND s.selected = 1
+                """, arguments: [scanId]))
+        }
+    }
+
     public func categoryState(_ category: Category) throws -> CategoryState {
         try pool.read { db in
             let raw = try String.fetchOne(

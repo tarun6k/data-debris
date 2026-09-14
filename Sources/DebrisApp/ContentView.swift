@@ -25,7 +25,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .home: return "house"
-        case .results: return "line.3.horizontal.decrease"
+        case .results: return "list.bullet"
         case .duplicates: return "square.on.square"
         case .autoClean: return "clock"
         case .history: return "clock.arrow.circlepath"
@@ -35,22 +35,54 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
-    @State private var selection: SidebarItem? = .home
+    @EnvironmentObject var model: AppModel
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selection) {
-                Section("Data Debris") {
-                    ForEach(SidebarItem.allCases) { item in
-                        Label(item.title, systemImage: item.systemImage)
-                            .tag(item)
+        if model.showWelcome {
+            WelcomeView()
+        } else {
+            NavigationSplitView {
+                List(selection: $model.sidebar) {
+                    Section("Data Debris") {
+                        ForEach(SidebarItem.allCases) { item in
+                            // Results and Duplicates need a scan first; an
+                            // untagged row cannot be selected (macOS 13 has
+                            // no .selectionDisabled).
+                            if (item == .results || item == .duplicates)
+                                && model.lastScan == nil && !model.isScanning {
+                                Label(item.title, systemImage: item.systemImage)
+                                    .foregroundStyle(.tertiary)
+                            } else {
+                                Label(item.title, systemImage: item.systemImage)
+                                    .tag(item)
+                            }
+                        }
                     }
                 }
+                .listStyle(.sidebar)
+                .navigationSplitViewColumnWidth(200)
+            } detail: {
+                detail
             }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(200)
-        } detail: {
-            PlaceholderDetailView(item: selection ?? .home)
+        }
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        switch model.sidebar ?? .home {
+        case .home:
+            HomeView()
+        case .results:
+            if model.isScanning {
+                ScanningView()
+            } else if let category = model.openCategory {
+                CategoryDetailView(category: category)
+                    .id(category) // reset scroll/filter state per category
+            } else {
+                ResultsView()
+            }
+        default:
+            PlaceholderDetailView(item: model.sidebar ?? .home)
         }
     }
 }
