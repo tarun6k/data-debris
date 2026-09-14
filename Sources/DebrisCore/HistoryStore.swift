@@ -35,6 +35,8 @@ public struct CleanRequest: Equatable, Sendable {
 
 public enum RunStatus: String, Sendable {
     case pending, running, completed, cancelled, restored, partiallyRestored
+    /// An Auto Clean that never ran: 24 h of deferrals (see `note`).
+    case skipped
 }
 
 public enum ItemStatus: String, Sendable {
@@ -87,6 +89,8 @@ public struct RunRecord: Sendable {
     public let freedBytes: Int64
     public let volumeFreeBefore: Int64
     public let volumeFreeAfter: Int64
+    /// Only on skipped Auto Clean runs: why nothing happened.
+    public let note: String?
 }
 
 public struct ItemRecord: Sendable {
@@ -161,7 +165,25 @@ public final class HistoryStore: @unchecked Sendable {
                 t.column("movedAt", .datetime)
             }
         }
+        migrator.registerMigration("v2") { db in
+            try db.alter(table: "runs") { t in
+                t.add(column: "note", .text)
+            }
+        }
         try migrator.migrate(pool)
+    }
+
+    /// A lightweight History row for an Auto Clean that gave up after 24 h of
+    /// deferrals — no items, nothing moved, just the reason.
+    @discardableResult
+    public func createSkippedAutoRun(note: String, at date: Date = Date()) throws -> Int64 {
+        try pool.write { db in
+            try db.execute(sql: """
+                INSERT INTO runs (mode, startedAt, finishedAt, disposal, status, note)
+                VALUES ('auto', ?, ?, 'trash', 'skipped', ?)
+                """, arguments: [date, date, note])
+            return db.lastInsertedRowID
+        }
     }
 
     // MARK: - Journal (S4: run + all items land in one durable transaction)
@@ -335,7 +357,8 @@ public final class HistoryStore: @unchecked Sendable {
             id: row["id"], mode: mode, startedAt: row["startedAt"], finishedAt: row["finishedAt"],
             disposal: disposal, status: status, estimatedBytes: row["estimatedBytes"],
             movedBytes: row["movedBytes"], freedBytes: row["freedBytes"],
-            volumeFreeBefore: row["volumeFreeBefore"], volumeFreeAfter: row["volumeFreeAfter"])
+            volumeFreeBefore: row["volumeFreeBefore"], volumeFreeAfter: row["volumeFreeAfter"],
+            note: row["note"])
     }
 
     private static func itemRecord(_ row: Row) -> ItemRecord? {
