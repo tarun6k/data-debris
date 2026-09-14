@@ -52,19 +52,3 @@ struct MenuBarContent: View {
         openWindow(id: "main")
     }
 }
-
-/// Settings, for now just General. Protected paths and licensing arrive in
-/// later phases.
-struct SettingsView: View {
-    @AppStorage("showInMenuBar") private var showInMenuBar = false
-
-    var body: some View {
-        Form {
-            Section("General") {
-                Toggle("Show in menu bar", isOn: $showInMenuBar)
-            }
-        }
-        .formStyle(.grouped)
-        .navigationTitle("Settings")
-    }
-}

@@ -31,6 +31,19 @@ struct AutoCleanView: View {
 
     var body: some View {
         Form {
+            if !model.entitlementState.isEntitled {
+                Section {
+                    HStack(spacing: 10) {
+                        Image(systemName: "lock")
+                            .foregroundStyle(.secondary)
+                        Text("Auto Clean is part of the paid plan — scanning stays free.")
+                            .font(.system(size: 12))
+                        Spacer()
+                        Button("Choose a plan") { model.startPurchase() }
+                            .controlSize(.small)
+                    }
+                }
+            }
             Section {
                 Toggle("Auto Clean", isOn: enabledBinding)
                     .toggleStyle(.switch)
@@ -50,6 +63,7 @@ struct AutoCleanView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Auto Clean")
+        .onAppear { model.refreshEntitlement() }
         .sheet(isPresented: $confirmingEnable) {
             AutoCleanEnableSheet {
                 Task {

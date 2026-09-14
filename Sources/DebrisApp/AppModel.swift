@@ -728,6 +728,63 @@ final class AppModel: ObservableObject {
         purchase?.checkoutCallbackReceived()
     }
 
+    // MARK: - Settings > License
+
+    var licensePayload: EntitlementPayload? { licenseStore.load()?.0 }
+
+    /// "Enter a different key" in Settings. ponytail: errors surface as
+    /// toasts here; the full Manage Macs list stays in the purchase flow.
+    func enterLicenseKey(_ key: String) async {
+        guard let service = licenseService else {
+            licenseToast = "The license service is not configured in this build"
+            return
+        }
+        do {
+            let entitlement = try await service.activate(
+                key: key, machineId: MachineIdentity.machineId(),
+                machineName: MachineIdentity.machineName())
+            try licenseStore.save(licenseKey: key, entitlement: entitlement, lastValidatedAt: Date())
+            refreshEntitlement()
+            entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)
+            if let (payload, _) = licenseStore.load() {
+                licenseToast = Self.activationToast(payload)
+            }
+        } catch LicenseClientError.activationLimit {
+            licenseToast = "This key is already active on 2 Macs. Deactivate one of them first."
+        } catch LicenseClientError.unknownKey {
+            licenseToast = "That key was not found. Check it against the email from your purchase."
+        } catch LicenseClientError.inactive {
+            licenseToast = "This key is no longer active (refunded or expired)."
+        } catch {
+            licenseToast = "Could not reach the license service. Check your connection and retry."
+        }
+    }
+
+    func recoverLicenseKey(email: String) async {
+        try? await licenseService?.recover(email: email)
+    }
+
+    /// Frees this Mac's slot on the server first; the local cache is cleared
+    /// only on success so the two never disagree about a used slot.
+    func deactivateThisMac() async {
+        guard let service = licenseService, let (_, stored) = licenseStore.load() else { return }
+        do {
+            try await service.deactivate(key: stored.licenseKey,
+                                         machineId: MachineIdentity.machineId())
+            licenseStore.clear()
+            refreshEntitlement()
+            entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)
+            licenseToast = "This Mac is deactivated — the license slot is free"
+        } catch {
+            licenseToast = "Could not reach the license service. Check your connection and retry."
+        }
+    }
+
+    static func activationToast(_ payload: EntitlementPayload) -> String {
+        "Data Debris is active until "
+            + payload.expiryDate.formatted(date: .abbreviated, time: .omitted)
+    }
+
     /// Written directly, not via updateAutoClean — acknowledging the privacy
     /// sheet must not churn the LaunchAgents.
     private func recordPrivacyAcknowledgement() {
@@ -746,8 +803,7 @@ final class AppModel: ObservableObject {
         guard case .activated(let payload) = outcome else { return }
         refreshEntitlement()
         entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)
-        licenseToast = "Data Debris is active until "
-            + payload.expiryDate.formatted(date: .abbreviated, time: .omitted)
+        licenseToast = Self.activationToast(payload)
         switch flow.resume {
         case .openReview(let entry): openReview(entry: entry)
         case .smartClean: smartClean()

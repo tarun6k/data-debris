@@ -4,6 +4,12 @@ import DebrisCore
 /// Screen 1: how full is my disk, when did I last clean, what can I do now.
 struct HomeView: View {
     @EnvironmentObject var model: AppModel
+    /// The expiry banner is dismissable per day, not forever.
+    @AppStorage("expiryBannerDismissedDay") private var expiryBannerDismissedDay = ""
+
+    private var today: String {
+        Date().formatted(.iso8601.year().month().day())
+    }
 
     private var lowSpace: Bool {
         guard let disk = model.disk, disk.total > 0 else { return false }
@@ -16,6 +22,13 @@ struct HomeView: View {
                 if !model.fdaGranted {
                     limitedAccessBanner
                 }
+                if case .expiring(let daysLeft) = model.entitlementState,
+                   expiryBannerDismissedDay != today {
+                    expiryBanner(daysLeft: daysLeft)
+                }
+                if case .lapsed = model.entitlementState {
+                    lapsedBanner
+                }
                 gaugeCard
                 actionRow
                 autoCleanCard
@@ -26,10 +39,49 @@ struct HomeView: View {
             .padding(24)
         }
         .navigationTitle("Data Debris")
-        .onAppear { model.refreshDisk() }
+        .onAppear {
+            model.refreshDisk()
+            model.refreshEntitlement()
+        }
     }
 
-    // MARK: - Banner
+    // MARK: - Banners
+
+    private func expiryBanner(daysLeft: Int) -> some View {
+        HStack {
+            Image(systemName: "hourglass")
+                .foregroundStyle(.orange)
+            Text(daysLeft == 0 ? "Your plan expires today"
+                : "Your plan expires in \(daysLeft) \(daysLeft == 1 ? "day" : "days")")
+                .font(.system(size: 12))
+            Spacer()
+            Button {
+                expiryBannerDismissedDay = today
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var lapsedBanner: some View {
+        HStack {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+            Text("Your plan has ended — scanning is still free")
+                .font(.system(size: 12))
+            Spacer()
+            Button("Renew") { model.startPurchase() }
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+    }
 
     private var limitedAccessBanner: some View {
         HStack {

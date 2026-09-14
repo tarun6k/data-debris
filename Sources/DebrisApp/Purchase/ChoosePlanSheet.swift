@@ -82,7 +82,11 @@ struct ChoosePlanSheet: View {
         }
         .frame(width: 720)
         .fixedSize(horizontal: false, vertical: true)
-        .sheet(isPresented: $showingLicenseEntry) { LicenseEntrySheet(flow: flow) }
+        .sheet(isPresented: $showingLicenseEntry) {
+            LicenseEntrySheet(
+                onActivate: { await flow.enterKey($0) },
+                onRecover: { await flow.recoverKey(email: $0) })
+        }
         .task { localized = await PaddlePricing.localizedTotals(config: config) }
     }
 
@@ -183,9 +187,11 @@ struct ChoosePlanSheet: View {
 
 // MARK: - License entry
 
-/// "Already have a license?" — activate an existing key or recover it by email.
+/// "Already have a license?" — activate an existing key or recover it by
+/// email. Closure-driven so the plan sheet and Settings share it.
 struct LicenseEntrySheet: View {
-    @ObservedObject var flow: PurchaseFlow
+    var onActivate: (String) async -> Void
+    var onRecover: (String) async -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var email = ""
@@ -211,7 +217,7 @@ struct LicenseEntrySheet: View {
             HStack {
                 Button("Recover my key by email") {
                     let address = email
-                    Task { await flow.recoverKey(email: address); recoverySent = true }
+                    Task { await onRecover(address); recoverySent = true }
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 12))
@@ -232,10 +238,10 @@ struct LicenseEntrySheet: View {
                     busy = true
                     let entered = key.trimmingCharacters(in: .whitespacesAndNewlines)
                     Task {
-                        await flow.enterKey(entered)
+                        await onActivate(entered)
                         busy = false
-                        // Success tears the whole purchase sheet down; an
-                        // error changed flow.step, which the parent shows.
+                        // Success tears the presenting sheet down too; an
+                        // error surfaces behind this (step or toast).
                         dismiss()
                     }
                 }
