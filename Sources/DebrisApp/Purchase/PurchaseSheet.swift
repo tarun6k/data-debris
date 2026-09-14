@@ -13,9 +13,11 @@ struct PurchaseSheet: View {
                 text: model.privacyText,
                 onContinue: { flow.acknowledgePrivacy() },
                 onNotNow: { flow.cancel() })
+        case .plan:
+            ChoosePlanSheet(flow: flow)
         default:
-            // Plan, waiting and error screens land in the next commits of
-            // this phase; until then any non-privacy step is escapable.
+            // Waiting and error screens land in the next commit of this
+            // phase; until then any remaining step is escapable.
             VStack(spacing: 16) {
                 ProgressView()
                 Button("Cancel") { flow.cancel() }
