@@ -26,6 +26,9 @@ enum Snapshot {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay - 0.5) {
             NSApp.activate(ignoringOtherApps: true) // active-window chrome
             if args.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
+            // Match the design PNG canvas so shots compare 1:1.
+            NSApp.windows.first { $0.isVisible }?
+                .setContentSize(NSSize(width: 1200, height: 800))
         }
         // The window can lag launch when the app starts unfocused; retry until
         // one is up rather than racing it with a fixed delay.
