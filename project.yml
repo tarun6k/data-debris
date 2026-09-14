@@ -44,7 +44,11 @@ targets:
     type: application
     platform: macOS
     sources:
-      - Sources/DebrisApp
+      - path: Sources/DebrisApp
+        excludes:
+          - "Resources/**"
+      - path: Sources/DebrisApp/Resources
+        buildPhase: resources
     dependencies:
       - target: DebrisCore
         embed: true

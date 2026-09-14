@@ -70,6 +70,37 @@ struct ContentView: View {
                 CleanSheet(flow: flow)
                     .environmentObject(model)
             }
+            // Privacy → plan → checkout, one sheet; Esc anywhere = cancel.
+            .sheet(item: purchaseBinding) { flow in
+                PurchaseSheet(flow: flow)
+                    .environmentObject(model)
+            }
+            .overlay(alignment: .bottom) { licenseToast }
+        }
+    }
+
+    /// Dismissing the sheet by any route (Esc, close) cancels the flow, so
+    /// polling always stops and nothing changes.
+    private var purchaseBinding: Binding<PurchaseFlow?> {
+        Binding(
+            get: { model.purchase },
+            set: { if $0 == nil { model.purchase?.cancel() } })
+    }
+
+    @ViewBuilder
+    private var licenseToast: some View {
+        if let text = model.licenseToast {
+            Text(text)
+                .font(.callout)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(.regularMaterial, in: Capsule())
+                .shadow(radius: 3)
+                .padding(.bottom, 18)
+                .task {
+                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    model.licenseToast = nil
+                }
         }
     }
 
