@@ -25,6 +25,19 @@ public enum AutoCleanNotify: String, Codable, CaseIterable, Sendable {
     case always, overOneGB, never
 }
 
+/// The Privacy & Security sheet acknowledgement (Screen 12): the SHA-256 of
+/// the sheet's strings at the time the user ticked the box. A text change in
+/// an update changes the hash and re-triggers the sheet once.
+public struct PrivacyAcknowledgement: Codable, Equatable, Sendable {
+    public var textHash: String
+    public var acknowledgedAt: Date
+
+    public init(textHash: String, acknowledgedAt: Date) {
+        self.textHash = textHash
+        self.acknowledgedAt = acknowledgedAt
+    }
+}
+
 /// The Auto Clean settings (Screen 8), persisted as settings.json next to the
 /// databases. Nothing is ticked until the user ticks it (S9).
 public struct AutoCleanConfig: Codable, Equatable, Sendable {
@@ -39,6 +52,9 @@ public struct AutoCleanConfig: Codable, Equatable, Sendable {
     public var browserCachesExcluded: Bool
     /// Sub-option: raise the age floor on developer-junk rules.
     public var developerMinAgeDays: Int?
+    /// Screen 12: set once the user scrolls to the end and ticks the box;
+    /// nil (or a stale hash) means the sheet is shown before any price.
+    public var privacyAcknowledgement: PrivacyAcknowledgement?
 
     public init(
         enabled: Bool = false,
@@ -47,7 +63,8 @@ public struct AutoCleanConfig: Codable, Equatable, Sendable {
         enabledRuleIds: [String] = [],
         notify: AutoCleanNotify = .always,
         browserCachesExcluded: Bool = false,
-        developerMinAgeDays: Int? = nil
+        developerMinAgeDays: Int? = nil,
+        privacyAcknowledgement: PrivacyAcknowledgement? = nil
     ) {
         self.enabled = enabled
         self.schedule = schedule
@@ -56,11 +73,12 @@ public struct AutoCleanConfig: Codable, Equatable, Sendable {
         self.notify = notify
         self.browserCachesExcluded = browserCachesExcluded
         self.developerMinAgeDays = developerMinAgeDays
+        self.privacyAcknowledgement = privacyAcknowledgement
     }
 
     private enum CodingKeys: String, CodingKey {
         case enabled, schedule, lowSpaceTriggerGB, enabledRuleIds, notify
-        case browserCachesExcluded, developerMinAgeDays
+        case browserCachesExcluded, developerMinAgeDays, privacyAcknowledgement
     }
 
     public init(from decoder: Decoder) throws {
@@ -74,6 +92,7 @@ public struct AutoCleanConfig: Codable, Equatable, Sendable {
         notify = try c.decodeIfPresent(AutoCleanNotify.self, forKey: .notify) ?? .always
         browserCachesExcluded = try c.decodeIfPresent(Bool.self, forKey: .browserCachesExcluded) ?? false
         developerMinAgeDays = try c.decodeIfPresent(Int.self, forKey: .developerMinAgeDays)
+        privacyAcknowledgement = try c.decodeIfPresent(PrivacyAcknowledgement.self, forKey: .privacyAcknowledgement)
     }
 
     // MARK: - Validation (S2: only autoCleanEligible rules can be ticked)

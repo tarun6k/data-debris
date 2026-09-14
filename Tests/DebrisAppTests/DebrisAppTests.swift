@@ -36,7 +36,8 @@ final class DebrisAppTests: XCTestCase {
             store: try FindingsStore(databaseURL: dir.appendingPathComponent("findings.sqlite")),
             history: try HistoryStore(databaseURL: dir.appendingPathComponent("history.sqlite")),
             exclusions: try ExclusionStore(fileURL: dir.appendingPathComponent("exclusions.json")),
-            catalogue: Catalogue(version: 1, rules: []))
+            catalogue: Catalogue(version: 1, rules: []),
+            licenseStore: LicenseFixture.activeStore())
         return (model, dir)
     }
 

@@ -31,7 +31,8 @@ final class AutoCleanViewTests: XCTestCase {
             launchAgents: LaunchAgentManager(
                 agentsDirectory: dir.appendingPathComponent("LaunchAgents"),
                 programPath: "/Applications/DataDebris.app/Contents/MacOS/DataDebris",
-                uid: 501, launchctl: { _ in 0 }))
+                uid: 501, launchctl: { _ in 0 }),
+            licenseStore: LicenseFixture.activeStore())
     }
 
     /// Only categories with eligible rules are offered, and a tick writes

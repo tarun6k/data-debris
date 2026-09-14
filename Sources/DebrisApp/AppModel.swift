@@ -28,6 +28,10 @@ final class AppModel: ObservableObject {
     let catalogue: Catalogue
     private let autoCleanConfigURL: URL?
     private let launchAgents: LaunchAgentManager
+    let licenseStore: LicenseStore
+    let entitlements: Entitlements
+    let licenseService: LicenseService?
+    let privacyText: PrivacySheetText
 
     @Published var sidebar: SidebarItem? = .home
     @Published var openCategory: Category?
@@ -35,6 +39,12 @@ final class AppModel: ObservableObject {
     @Published var resultSort: ResultSort = .size
     /// Non-nil while the Review/Cleaning/Done sheet is up — the only gate (S2).
     @Published var cleanFlow: CleanFlow?
+    /// Non-nil while the purchase sheets are up (privacy → plan → waiting).
+    @Published var purchase: PurchaseFlow?
+    /// Mirror of Entitlements.state for SwiftUI; refreshed after any license event.
+    @Published private(set) var entitlementState: EntitlementState = .free
+    /// One-line confirmation ("Data Debris is active until 14 Sep 2027").
+    @Published var licenseToast: String?
     /// Set after a clean: the last scan's numbers no longer match the disk.
     @Published private(set) var cleanedSinceScan = false
 
@@ -78,16 +88,25 @@ final class AppModel: ObservableObject {
 
     init(store: FindingsStore, history: HistoryStore, exclusions: ExclusionStore,
          catalogue: Catalogue, autoCleanConfigURL: URL? = nil,
-         launchAgents: LaunchAgentManager? = nil) {
+         launchAgents: LaunchAgentManager? = nil,
+         licenseStore: LicenseStore? = nil,
+         licenseService: LicenseService? = nil,
+         privacyText: PrivacySheetText? = nil) {
         self.store = store
         self.history = history
         self.exclusions = exclusions
         self.catalogue = catalogue
         self.autoCleanConfigURL = autoCleanConfigURL ?? (try? AutoCleanConfig.defaultFileURL())
         self.launchAgents = launchAgents ?? LaunchAgentManager()
+        self.licenseStore = licenseStore ?? LicenseStore()
+        self.entitlements = Entitlements(store: self.licenseStore)
+        self.licenseService = licenseService
+            ?? LicenseConfig.current.workerURL.map { LicenseClient(baseURL: $0) }
+        self.privacyText = privacyText ?? PrivacySheetText()
         if let url = self.autoCleanConfigURL {
             autoCleanConfig = AutoCleanConfig.load(from: url).validated(against: catalogue)
         }
+        entitlementState = entitlements.state
 
         let defaults = UserDefaults.standard
         // First launch, or FDA revoked after we once saw it granted.
@@ -136,6 +155,7 @@ final class AppModel: ObservableObject {
                     schedule: model.autoCleanConfig.schedule,
                     lowSpaceTrigger: model.autoCleanConfig.lowSpaceTriggerGB != nil)
             }
+            model.startLicenseHousekeeping()
             return model
         } catch {
             fatalError("Cannot open the app's data folder: \(error)")
@@ -297,6 +317,9 @@ final class AppModel: ObservableObject {
     }
 
     func setAutoCleanEnabled(_ on: Bool) {
+        if on {
+            guard requireEntitled(.autoClean, toResume: .enableAutoClean) else { return }
+        }
         updateAutoClean { $0.enabled = on }
     }
 
@@ -346,6 +369,7 @@ final class AppModel: ObservableObject {
 
     /// "Run now": same engine and preconditions, still Trash-only (S3).
     func runAutoCleanNow() {
+        guard requireEntitled(.autoClean, toResume: .runAutoCleanNow) else { return }
         guard !autoCleanRunning else { return }
         autoCleanRunning = true
         autoCleanLastOutcome = nil
@@ -475,8 +499,10 @@ final class AppModel: ObservableObject {
     }
 
     /// Smart Clean: select every safe finding, deselect the rest, and open
-    /// Review directly. Review is still the only gate (S2).
+    /// Review directly. Review is still the only gate (S2). Gated before it
+    /// touches the selection, so "Not now" really changes nothing.
     func smartClean() {
+        guard requireEntitled(.clean, toResume: .smartClean) else { return }
         let safe = findings.filter { $0.level == .safe && $0.isReclaimable && !isExcluded($0) }
         let rest = findings.filter { $0.level != .safe && $0.isReclaimable }
         try? store.setSelected(safe.map(\.id), true)
@@ -549,6 +575,7 @@ final class AppModel: ObservableObject {
 
     func openReview(entry: CleanFlow.Entry = .manual) {
         guard cleanFlow == nil else { return }
+        guard requireEntitled(.clean, toResume: .openReview(entry)) else { return }
         let selection = findings.filter {
             selectedIds.contains($0.id) && $0.isReclaimable && !isExcluded($0)
         }
@@ -627,6 +654,101 @@ final class AppModel: ObservableObject {
         try? store.setSelected(batch.findingIds, true)
         lastExclusionBatch = nil
         refresh()
+    }
+
+    // MARK: - Licensing (Screen 12/13 — the purchase gate)
+
+    var privacyAcknowledged: Bool {
+        autoCleanConfig.privacyAcknowledgement?.textHash == privacyText.textHash
+    }
+
+    func refreshEntitlement() {
+        entitlementState = entitlements.state
+    }
+
+    /// Every locked action funnels through here: allowed = proceed; otherwise
+    /// the purchase flow starts and, on activation, resumes the action.
+    @discardableResult
+    func requireEntitled(_ feature: LockedFeature, toResume resume: PurchaseFlow.ResumeAction) -> Bool {
+        refreshEntitlement()
+        guard entitlements.require(feature) == .needsPurchase else { return true }
+        startPurchase(resuming: resume)
+        return false
+    }
+
+    func startPurchase(resuming resume: PurchaseFlow.ResumeAction = .none) {
+        guard purchase == nil, cleanFlow == nil else { return }
+        guard let service = licenseService else {
+            licenseToast = "The license service is not configured in this build"
+            return
+        }
+        purchase = PurchaseFlow(
+            resume: resume,
+            acknowledged: privacyAcknowledged,
+            service: service,
+            store: licenseStore,
+            launchCheckout: { [weak self] plan, autoRenew, reference in
+                self?.openCheckout(plan: plan, autoRenew: autoRenew, reference: reference)
+            },
+            recordAcknowledgement: { [weak self] in self?.recordPrivacyAcknowledgement() },
+            onDone: { [weak self] flow, outcome in self?.purchaseDidFinish(flow, outcome) })
+    }
+
+    /// Replaced by the local checkout page + browser hand-off in the checkout
+    /// step of this phase; the coordinator only needs the seam.
+    func openCheckout(plan: LicensePlan, autoRenew: Bool, reference: String) {
+    }
+
+    /// Written directly, not via updateAutoClean — acknowledging the privacy
+    /// sheet must not churn the LaunchAgents.
+    private func recordPrivacyAcknowledgement() {
+        var config = autoCleanConfig
+        config.privacyAcknowledgement = PrivacyAcknowledgement(
+            textHash: privacyText.textHash, acknowledgedAt: Date())
+        autoCleanConfig = config
+        if let url = autoCleanConfigURL { try? config.save(to: url) }
+    }
+
+    private func purchaseDidFinish(_ flow: PurchaseFlow, _ outcome: PurchaseFlow.Outcome) {
+        guard purchase === flow else { return }
+        purchase = nil
+        guard case .activated(let payload) = outcome else { return }
+        refreshEntitlement()
+        entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)
+        licenseToast = "Data Debris is active until "
+            + payload.expiryDate.formatted(date: .abbreviated, time: .omitted)
+        switch flow.resume {
+        case .openReview(let entry): openReview(entry: entry)
+        case .smartClean: smartClean()
+        case .enableAutoClean: setAutoCleanEnabled(true)
+        case .runAutoCleanNow: runAutoCleanNow()
+        case .none: break
+        }
+    }
+
+    /// Launch and wake: at most one validate round-trip per 24 h; the
+    /// LaunchAgents follow the entitlement (no unpaid background cleaning).
+    func licenseHousekeeping() {
+        refreshEntitlement()
+        entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)
+        guard let service = licenseService else { return }
+        Task {
+            await entitlements.validateIfNeeded(machineId: MachineIdentity.machineId()) {
+                try await service.validate(key: $0, machineId: $1)
+            }
+            refreshEntitlement()
+            entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)
+        }
+    }
+
+    /// live() only — tests must never observe system notifications.
+    func startLicenseHousekeeping() {
+        licenseHousekeeping()
+        NSWorkspace.shared.notificationCenter
+            .publisher(for: NSWorkspace.didWakeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.licenseHousekeeping() }
+            .store(in: &cancellables)
     }
 
     // MARK: - Debug screenshot routing

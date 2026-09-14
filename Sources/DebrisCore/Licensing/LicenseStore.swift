@@ -66,7 +66,9 @@ public struct LicenseStore {
     }
 
     private let backing: SecretStore
-    private let publicKey: Data
+    /// Exposed so the purchase flow can verify server answers (the machines
+    /// list on an activation-limit) against the same key this store trusts.
+    public let publicKey: Data
 
     public init(backing: SecretStore = KeychainSecretStore(),
                 publicKey: Data = LicensePublicKey.production) {

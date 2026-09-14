@@ -118,6 +118,22 @@ final class AutoCleanTests: XCTestCase {
         XCTAssertEqual(AutoCleanConfig.load(from: url), AutoCleanConfig())
     }
 
+    /// Phase 7B: the privacy acknowledgement rides in settings.json; an older
+    /// file without it still loads (decodeIfPresent), and it round-trips.
+    func testPrivacyAcknowledgementRoundTripAndOlderFileLoads() throws {
+        let url = dataDir.appendingPathComponent("settings.json")
+        var config = AutoCleanConfig()
+        config.privacyAcknowledgement = PrivacyAcknowledgement(
+            textHash: "abc123", acknowledgedAt: Date(timeIntervalSince1970: 1_800_000_000))
+        try config.save(to: url)
+        XCTAssertEqual(AutoCleanConfig.load(from: url), config)
+
+        try Data(#"{"enabled": true}"#.utf8).write(to: url)
+        let older = AutoCleanConfig.load(from: url)
+        XCTAssertTrue(older.enabled)
+        XCTAssertNil(older.privacyAcknowledgement)
+    }
+
     func testBrowserCachesSubOptionStripsBrowserRules() {
         var config = AutoCleanConfig(enabledRuleIds: catalogue.rules
             .filter { $0.autoCleanEligible && $0.category == .appCaches }
