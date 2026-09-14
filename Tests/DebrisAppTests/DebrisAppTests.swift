@@ -106,4 +106,115 @@ final class DebrisAppTests: XCTestCase {
         XCTAssertEqual(model.visibleFindings(in: .appCaches).count, 2)
         XCTAssertTrue(model.selectedIds.contains(excludeMe.id))
     }
+
+    // MARK: - Clean flow (Phase 4B)
+
+    /// Two real files behind two rules, both safe so S2 pre-selects them.
+    @MainActor
+    private func makeFlowModel() throws -> (model: AppModel, dir: URL, cache: Finding, log: Finding) {
+        let (model, dir) = try makeModel()
+        let cachePath = dir.appendingPathComponent("cache.dat").path
+        let logPath = dir.appendingPathComponent("app.log").path
+        FileManager.default.createFile(atPath: cachePath, contents: Data("cache".utf8))
+        FileManager.default.createFile(atPath: logPath, contents: Data("log".utf8))
+        let cache = finding(cachePath, level: .safe, category: .appCaches)
+        let log = finding(logPath, level: .safe, category: .logs)
+        let scanId = try model.store.beginScan()
+        try model.store.upsert([cache, log], scanId: scanId)
+        try model.store.finishScan(scanId, status: .complete, deniedCount: 0)
+        model.refresh()
+        return (model, dir, cache, log)
+    }
+
+    /// S2: Review never opens on an empty plan — no selection, or a selection
+    /// whose files vanished since the scan.
+    @MainActor
+    func testReviewCannotOpenOnEmptyPlan() throws {
+        let (model, dir) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        XCTAssertFalse(model.canReview) // the Review button is disabled
+        model.openReview()
+        XCTAssertNil(model.cleanFlow)
+
+        // Selected but gone from disk: the planner drops it, the sheet stays shut.
+        let scanId = try model.store.beginScan()
+        let ghost = finding(dir.path + "/vanished.dat", level: .safe, category: .appCaches)
+        try model.store.upsert([ghost], scanId: scanId)
+        try model.store.finishScan(scanId, status: .complete, deniedCount: 0)
+        model.refresh()
+        XCTAssertTrue(model.canReview)
+        model.openReview()
+        XCTAssertNil(model.cleanFlow)
+    }
+
+    /// S3: permanent delete needs the second confirmation; cancelling it
+    /// returns the run to Trash.
+    @MainActor
+    func testPermanentRequiresSecondConfirmationAndCancelReverts() throws {
+        let (model, dir, _, _) = try makeFlowModel()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        model.openReview()
+        let flow = try XCTUnwrap(model.cleanFlow)
+
+        XCTAssertEqual(flow.disposal, .trash)
+        flow.requestDisposal(.permanent)
+        XCTAssertTrue(flow.confirmingPermanent)      // alert pending
+        XCTAssertEqual(flow.disposal, .trash)        // nothing flipped yet
+        flow.cancelPermanent()
+        XCTAssertEqual(flow.disposal, .trash)
+        XCTAssertEqual(flow.plan.request.disposal, .trash)
+
+        flow.requestDisposal(.permanent)
+        flow.confirmPermanent()
+        XCTAssertEqual(flow.disposal, .permanent)
+        XCTAssertEqual(flow.plan.request.disposal, .permanent)
+    }
+
+    /// "Remove from list" drops that rule's items from the plan and unticks
+    /// them in the stored selection.
+    @MainActor
+    func testRemoveFromListDropsRuleItemsAndUnticks() throws {
+        let (model, dir, cache, log) = try makeFlowModel()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        model.openReview()
+        let flow = try XCTUnwrap(model.cleanFlow)
+        XCTAssertEqual(flow.plan.items.count, 2)
+
+        flow.removeRule(cache.ruleId)
+
+        XCTAssertEqual(flow.plan.items.map(\.ruleId), [log.ruleId])
+        XCTAssertFalse(model.selectedIds.contains(cache.id))
+        XCTAssertTrue(model.selectedIds.contains(log.id))
+    }
+
+    /// S10: the "fully reclaimed once Trash is emptied" line appears exactly
+    /// when a Trash run freed less than it moved.
+    func testDoneReclaimNoteShownWhenFreedLessThanMoved() {
+        XCTAssertTrue(DoneView.showsReclaimNote(freed: 0, moved: 1_000, disposal: .trash))
+        XCTAssertTrue(DoneView.showsReclaimNote(freed: 999, moved: 1_000, disposal: .trash))
+        XCTAssertFalse(DoneView.showsReclaimNote(freed: 1_000, moved: 1_000, disposal: .trash))
+        XCTAssertFalse(DoneView.showsReclaimNote(freed: 0, moved: 0, disposal: .trash))
+        XCTAssertFalse(DoneView.showsReclaimNote(freed: 0, moved: 1_000, disposal: .permanent))
+    }
+
+    /// The Undo button is disabled with a stated reason whenever
+    /// UndoAvailability is unavailable.
+    func testUndoDisabledReasonCoversEveryUnavailableCase() {
+        XCTAssertNil(DoneView.undoDisabledReason(.available))
+        XCTAssertNil(DoneView.undoDisabledReason(.partiallyAvailable(1, of: 2)))
+        for reason: UndoAvailability.Reason in
+            [.permanentDelete, .trashEmptied, .alreadyRestored, .nothingMoved] {
+            XCTAssertNotNil(DoneView.undoDisabledReason(.unavailable(reason)))
+        }
+    }
+
+    /// S3: an Auto Clean run can never reach the permanent path. The request
+    /// type has no auto+permanent constructor, and the Review sheet can only
+    /// be entered manually or via Smart Clean.
+    func testAutoModeCanNeverBePermanent() {
+        XCTAssertEqual(CleanRequest.autoClean.mode, .auto)
+        XCTAssertEqual(CleanRequest.autoClean.disposal, .trash)
+        XCTAssertEqual(CleanFlow.Entry.allCases, [.manual, .smart])
+    }
 }
