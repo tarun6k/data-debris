@@ -9,7 +9,8 @@ struct CleanSheet: View {
         Group {
             switch flow.stage {
             case .review: ReviewView(flow: flow)
-            default: ReviewView(flow: flow) // Cleaning and Done land next
+            case .cleaning: CleaningView(flow: flow)
+            case .done: CleaningView(flow: flow) // DoneView lands next
             }
         }
         .frame(width: 700, height: 540)
