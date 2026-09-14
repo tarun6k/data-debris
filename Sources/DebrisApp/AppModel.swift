@@ -85,6 +85,17 @@ final class AppModel: ObservableObject {
             .sink { [weak self] scanning in if !scanning { self?.scanFinished() } }
             .store(in: &cancellables)
 
+        // A headless auto-clean process announces its run; pick up the new
+        // History row and disk numbers without a relaunch.
+        DistributedNotificationCenter.default()
+            .publisher(for: .debrisAutoCleanDidRun)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refresh()
+                self?.refreshDisk()
+            }
+            .store(in: &cancellables)
+
         refresh()
         applyDebugRoute()
         #if DEBUG

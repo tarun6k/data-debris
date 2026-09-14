@@ -48,11 +48,15 @@ enum Snapshot {
 }
 #endif
 
-@main
+// @main lives on Main, which routes --auto-clean to the headless runner.
 struct DataDebrisApp: App {
-    @StateObject private var model = AppModel.live()
+    @StateObject private var model: AppModel
 
     init() {
+        let model = AppModel.live()
+        _model = StateObject(wrappedValue: model)
+        // Before anything else: a notification click may be the launch reason.
+        NotificationHandler.shared.install(model: model)
         #if DEBUG
         Snapshot.armIfRequested()
         #endif
