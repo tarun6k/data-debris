@@ -206,6 +206,12 @@ struct ReviewView: View {
                     }
                     VStack(alignment: .leading, spacing: 1) {
                         PathText(url: URL(fileURLWithPath: item.originalPath))
+                        if group.category == .duplicates,
+                           let note = flow.duplicateNote(forPath: item.originalPath) {
+                            Text(note)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
                         if item.requiresPermanent {
                             Text("No Trash on this volume · will be deleted permanently")
                                 .font(.system(size: 11))

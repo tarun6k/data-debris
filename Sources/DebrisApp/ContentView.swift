@@ -87,6 +87,8 @@ struct ContentView: View {
             } else {
                 ResultsView()
             }
+        case .duplicates:
+            DuplicatesView()
         case .history:
             HistoryView()
         default:

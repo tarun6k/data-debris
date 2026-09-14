@@ -100,6 +100,11 @@ final class CleanFlow: ObservableObject, Identifiable {
         plan.runningAppConflicts.filter { !plan.skipBundleIds.contains($0.bundleId) }
     }
 
+    /// Duplicate rows in Review show which copy stays ("Identical to …").
+    func duplicateNote(forPath path: String) -> String? {
+        selection.first { $0.category == .duplicates && $0.url.path == path }?.reason
+    }
+
     // MARK: - Review actions
 
     func requestDisposal(_ new: Disposal) {

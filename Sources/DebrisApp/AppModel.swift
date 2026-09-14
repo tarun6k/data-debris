@@ -51,6 +51,16 @@ final class AppModel: ObservableObject {
     struct ExclusionBatch { let entries: [(path: String, isFolder: Bool)]; let findingIds: [String] }
     @Published var lastExclusionBatch: ExclusionBatch?
 
+    @Published private(set) var duplicateGroups: [DuplicateGroup] = []
+    @Published private(set) var clonePairsIgnored = 0
+    /// "done" | "skipped" | nil (scan predates Phase 5).
+    @Published private(set) var duplicateStatus: String?
+    /// Set by "Apply rule to all" so the toast can put the keepers back.
+    struct KeeperBatch { let previousKeepers: [String: String] } // group hash → keeper id
+    @Published var lastKeeperBatch: KeeperBatch?
+
+    let home = FileManager.default.homeDirectoryForCurrentUser
+
     private var cancellables: Set<AnyCancellable> = []
     private var scanPoll: AnyCancellable?
 
@@ -162,9 +172,17 @@ final class AppModel: ObservableObject {
         if let scanId = lastScan?.id {
             findings = (try? store.findings(in: scanId)) ?? []
             selectedIds = (try? store.selectedFindingIds(in: scanId)) ?? []
+            let dup = (try? store.duplicates(in: scanId, home: home))
+                ?? (groups: [], clonePairs: 0, status: nil)
+            duplicateGroups = dup.groups
+            clonePairsIgnored = dup.clonePairs
+            duplicateStatus = dup.status
         } else {
             findings = []
             selectedIds = []
+            duplicateGroups = []
+            clonePairsIgnored = 0
+            duplicateStatus = nil
         }
         let selected = (try? store.selectedTotals()) ?? (0, 0)
         selectedBytes = selected.0
@@ -287,6 +305,62 @@ final class AppModel: ObservableObject {
         openReview(entry: .smart)
     }
 
+    // MARK: - Duplicates
+
+    var duplicateReclaimableBytes: Int64 {
+        duplicateGroups.reduce(0) { $0 + $1.reclaimableBytes }
+    }
+
+    /// S7 guard: the keeper is unselectable (it has no Finding, so selecting
+    /// it is impossible by construction — this refuses it defensively), and a
+    /// selection that would leave no unselected copy in the group is refused.
+    func canSelectDuplicate(_ copy: DuplicateCopy, in group: DuplicateGroup) -> Bool {
+        guard copy.findingId != group.keeperId else { return false }
+        return group.copies.contains {
+            $0.findingId != copy.findingId && !selectedIds.contains($0.findingId)
+        }
+    }
+
+    func toggleDuplicate(_ copy: DuplicateCopy, in group: DuplicateGroup) {
+        if selectedIds.contains(copy.findingId) {
+            setSelected([copy.findingId], false)
+        } else if canSelectDuplicate(copy, in: group) {
+            setSelected([copy.findingId], true)
+        }
+    }
+
+    /// How many groups "Apply rule to all" would move the keeper in.
+    func groupsAffected(by rule: KeeperRule) -> Int {
+        duplicateGroups.filter { group in
+            if let target = group.keeper(under: rule) { return target != group.keeperId }
+            return false
+        }.count
+    }
+
+    func applyKeeperRule(_ rule: KeeperRule) {
+        guard let scanId = lastScan?.id else { return }
+        var previous: [String: String] = [:]
+        for var group in duplicateGroups {
+            guard let target = group.keeper(under: rule), target != group.keeperId else { continue }
+            previous[group.hash] = group.keeperId
+            guard (try? group.setKeeper(target)) != nil else { continue }
+            try? store.updateKeeper(of: group, scanId: scanId, home: home)
+        }
+        lastKeeperBatch = previous.isEmpty ? nil : KeeperBatch(previousKeepers: previous)
+        refresh()
+    }
+
+    func undoKeeperBatch() {
+        guard let batch = lastKeeperBatch, let scanId = lastScan?.id else { return }
+        for var group in duplicateGroups {
+            guard let old = batch.previousKeepers[group.hash],
+                  (try? group.setKeeper(old)) != nil else { continue }
+            try? store.updateKeeper(of: group, scanId: scanId, home: home)
+        }
+        lastKeeperBatch = nil
+        refresh()
+    }
+
     // MARK: - Clean flow (S2: Review is the only gate)
 
     var canReview: Bool { selectedCount > 0 && !isScanning }
@@ -398,6 +472,9 @@ final class AppModel: ObservableObject {
         case "history":
             showWelcome = false
             sidebar = .history
+        case "duplicates":
+            showWelcome = false
+            sidebar = .duplicates
         default:
             if route.hasPrefix("detail:"), let category = Category(rawValue: String(route.dropFirst(7))) {
                 showWelcome = false

@@ -37,7 +37,9 @@ private struct ScanningContent: View {
             .padding(.bottom, 20)
 
             Group {
-                if let fraction = model.scanProgressFraction {
+                // Hashing time depends on duplicate bytes, unknowable up
+                // front — indeterminate is the honest bar (S10 in spirit).
+                if let fraction = model.scanProgressFraction, session.dupPhase != .hashing {
                     ProgressView(value: fraction)
                 } else {
                     ProgressView()
@@ -62,12 +64,12 @@ private struct ScanningContent: View {
             PathText(url: URL(fileURLWithPath: session.currentPath.isEmpty ? "/" : session.currentPath))
                 .padding(.bottom, 10)
 
-            if showSkipDuplicates {
+            if showSkipDuplicates, session.dupPhase == .queued || session.dupPhase == .hashing {
                 HStack(spacing: 4) {
                     Text("Duplicate hashing runs last and is throttled on battery.")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    Button("Skip duplicates") {} // no-op until duplicates land (Phase 5)
+                    Button("Skip duplicates") { session.skipDuplicates() }
                         .buttonStyle(.link)
                         .font(.system(size: 12))
                 }
@@ -91,7 +93,8 @@ private struct ScanningContent: View {
     @ViewBuilder
     private func categoryRow(_ category: Category) -> some View {
         let row = model.rows.first { $0.category == category }
-        let active = (row?.count ?? 0) > 0
+        let hashing = category == .duplicates && session.dupPhase == .hashing
+        let active = (row?.count ?? 0) > 0 || hashing
 
         HStack(spacing: 12) {
             if active {
@@ -110,7 +113,16 @@ private struct ScanningContent: View {
 
             Spacer()
 
-            if let row, row.count > 0 {
+            if hashing, let progress = session.dupProgress {
+                Text("hashing · \(Format.count(progress.filesHashed)) files · \(Format.bytes(progress.bytesHashed))…")
+                    .font(.system(size: 13))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            } else if category == .duplicates && session.dupPhase == .skipped {
+                Text("skipped")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.tertiary)
+            } else if let row, row.count > 0 {
                 Text("\(Format.bytes(row.bytes)) · \(Format.count(row.count)) items…")
                     .font(.system(size: 13))
                     .monospacedDigit()
