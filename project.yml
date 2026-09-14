@@ -28,6 +28,8 @@ targets:
     platform: macOS
     sources:
       - Sources/DebrisCore
+      - path: Resources/catalogue.json
+        buildPhase: resources
     dependencies:
       - package: GRDB
         product: GRDB
@@ -59,6 +61,8 @@ targets:
     platform: macOS
     sources:
       - Tests/DebrisCoreTests
+      - path: Tests/Fixtures
+        buildPhase: resources
     dependencies:
       - target: DebrisCore
       - target: DataDebris

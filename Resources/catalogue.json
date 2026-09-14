@@ -1,0 +1,323 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "appcaches.browser.safari",
+      "category": "appCaches",
+      "level": "safe",
+      "match": ["~/Library/Caches/com.apple.Safari"],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "com.apple.Safari",
+      "reason": "Safari's cache of visited pages. Safari rebuilds it as you browse.",
+      "consequence": "Pages load slower on first visit; some sites may sign you out.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.browser.chrome",
+      "category": "appCaches",
+      "level": "safe",
+      "match": [
+        "~/Library/Caches/Google/Chrome/**/Cache",
+        "~/Library/Caches/Google/Chrome/**/Code Cache",
+        "~/Library/Caches/Google/Chrome/**/GPUCache"
+      ],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "com.google.Chrome",
+      "reason": "Chrome's page, script and GPU caches. Chrome rebuilds them as you browse.",
+      "consequence": "Pages load slower on first visit; some sites may sign you out.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.browser.edge",
+      "category": "appCaches",
+      "level": "safe",
+      "match": [
+        "~/Library/Caches/Microsoft Edge/**/Cache",
+        "~/Library/Caches/Microsoft Edge/**/Code Cache",
+        "~/Library/Caches/Microsoft Edge/**/GPUCache"
+      ],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "com.microsoft.edgemac",
+      "reason": "Edge's page, script and GPU caches. Edge rebuilds them as you browse.",
+      "consequence": "Pages load slower on first visit; some sites may sign you out.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.browser.brave",
+      "category": "appCaches",
+      "level": "safe",
+      "match": [
+        "~/Library/Caches/BraveSoftware/Brave-Browser/**/Cache",
+        "~/Library/Caches/BraveSoftware/Brave-Browser/**/Code Cache",
+        "~/Library/Caches/BraveSoftware/Brave-Browser/**/GPUCache"
+      ],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "com.brave.Browser",
+      "reason": "Brave's page, script and GPU caches. Brave rebuilds them as you browse.",
+      "consequence": "Pages load slower on first visit; some sites may sign you out.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.browser.arc",
+      "category": "appCaches",
+      "level": "safe",
+      "match": [
+        "~/Library/Caches/Arc/**/Cache",
+        "~/Library/Caches/Arc/**/Code Cache",
+        "~/Library/Caches/Arc/**/GPUCache"
+      ],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "company.thebrowser.Browser",
+      "reason": "Arc's page, script and GPU caches. Arc rebuilds them as you browse.",
+      "consequence": "Pages load slower on first visit; some sites may sign you out.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.browser.firefox",
+      "category": "appCaches",
+      "level": "safe",
+      "match": ["~/Library/Caches/Firefox/Profiles/*/cache2"],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "org.mozilla.firefox",
+      "reason": "Firefox's page cache. Firefox rebuilds it as you browse.",
+      "consequence": "Pages load slower on first visit; some sites may sign you out.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.media.spotify",
+      "category": "appCaches",
+      "level": "safe",
+      "match": ["~/Library/Caches/com.spotify.client"],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "com.spotify.client",
+      "reason": "Spotify's cache of streamed audio and artwork.",
+      "consequence": "Offline content re-downloads.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.media.slack",
+      "category": "appCaches",
+      "level": "safe",
+      "match": ["~/Library/Caches/com.tinyspeck.slackmacgap"],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "com.tinyspeck.slackmacgap",
+      "reason": "Slack's cache of message images and attachments.",
+      "consequence": "Offline content re-downloads.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.media.discord",
+      "category": "appCaches",
+      "level": "safe",
+      "match": ["~/Library/Caches/com.hnc.Discord"],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "com.hnc.Discord",
+      "reason": "Discord's cache of images and media.",
+      "consequence": "Offline content re-downloads.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.media.teams",
+      "category": "appCaches",
+      "level": "safe",
+      "match": [
+        "~/Library/Caches/com.microsoft.teams2",
+        "~/Library/Caches/com.microsoft.teams"
+      ],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "com.microsoft.teams2",
+      "reason": "Teams' cache of images and media.",
+      "consequence": "Offline content re-downloads.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.media.zoom",
+      "category": "appCaches",
+      "level": "safe",
+      "match": ["~/Library/Caches/us.zoom.xos"],
+      "unit": "directory",
+      "predicates": [],
+      "owner": "us.zoom.xos",
+      "reason": "Zoom's cache of avatars and media.",
+      "consequence": "Offline content re-downloads.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "dev.packagecaches",
+      "category": "developer",
+      "level": "safe",
+      "match": [
+        "~/.npm/_cacache",
+        "~/.yarn/cache",
+        "~/Library/Caches/Yarn",
+        "~/Library/Caches/pip",
+        "~/.gradle/caches",
+        "~/.cargo/registry/cache",
+        "~/Library/Caches/CocoaPods",
+        "~/Library/Caches/org.swift.swiftpm",
+        "~/Library/Caches/Homebrew"
+      ],
+      "unit": "directory",
+      "predicates": [],
+      "owner": null,
+      "reason": "Downloaded package archives kept by npm, Yarn, pip, Gradle, Cargo, CocoaPods, Swift Package Manager and Homebrew.",
+      "consequence": "The next install or build re-downloads packages.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "appcaches.generic",
+      "category": "appCaches",
+      "level": "safe",
+      "match": ["~/Library/Caches/*"],
+      "unit": "directory",
+      "predicates": [],
+      "owner": null,
+      "reason": "Cache data this app can regenerate.",
+      "consequence": "The app may start slower once.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "logs.diagnosticreports",
+      "category": "logs",
+      "level": "safe",
+      "match": ["~/Library/Logs/DiagnosticReports/**"],
+      "unit": "file",
+      "predicates": [{ "mtimeOlderThanDays": 7 }],
+      "owner": null,
+      "reason": "Crash and diagnostic reports older than a week.",
+      "consequence": "Older crash reports won't be available to developers.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "logs.general",
+      "category": "logs",
+      "level": "safe",
+      "match": ["~/Library/Logs/**"],
+      "unit": "file",
+      "predicates": [{ "mtimeOlderThanDays": 7 }],
+      "owner": null,
+      "reason": "Log files older than a week. Apps write new logs as they run.",
+      "consequence": "Older logs won't be available for troubleshooting.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "dev.xcode.deriveddata",
+      "category": "developer",
+      "level": "safe",
+      "match": ["~/Library/Developer/Xcode/DerivedData/*"],
+      "unit": "directory",
+      "predicates": [{ "mtimeOlderThanDays": 2 }],
+      "owner": "com.apple.dt.Xcode",
+      "reason": "Build intermediates. Xcode rebuilds them automatically.",
+      "consequence": "Your next build will take longer.",
+      "autoCleanEligible": true
+    },
+    {
+      "id": "dev.xcode.devicesupport",
+      "category": "developer",
+      "level": "review",
+      "match": [
+        "~/Library/Developer/Xcode/iOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/watchOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/tvOS DeviceSupport/*"
+      ],
+      "unit": "directory",
+      "predicates": [{ "mtimeOlderThanDays": 90 }],
+      "owner": "com.apple.dt.Xcode",
+      "reason": "Debug symbols for OS versions of previously connected devices.",
+      "consequence": "Re-downloaded when a device with that OS connects again.",
+      "autoCleanEligible": false
+    },
+    {
+      "id": "dev.xcode.archives",
+      "category": "developer",
+      "level": "manual",
+      "match": ["~/Library/Developer/Xcode/Archives/*/*.xcarchive"],
+      "unit": "directory",
+      "predicates": [{ "mtimeOlderThanDays": 180 }],
+      "owner": "com.apple.dt.Xcode",
+      "reason": "App archives from past builds and distributions.",
+      "consequence": "Needed to symbolicate crash reports for those builds.",
+      "autoCleanEligible": false
+    },
+    {
+      "id": "dev.simulators.runtimes",
+      "category": "developer",
+      "level": "review",
+      "match": ["~/Library/Developer/CoreSimulator/Profiles/Runtimes/*"],
+      "unit": "directory",
+      "predicates": [{ "mtimeOlderThanDays": 90 }],
+      "owner": "com.apple.dt.Xcode",
+      "reason": "Downloaded simulator runtimes not used recently.",
+      "consequence": "Re-download from Xcode to use that runtime again.",
+      "autoCleanEligible": false
+    },
+    {
+      "id": "dev.projectbuild",
+      "category": "developer",
+      "level": "review",
+      "match": [
+        "**/node_modules",
+        "**/.build",
+        "**/build",
+        "**/target",
+        "**/DerivedData"
+      ],
+      "unit": "directory",
+      "predicates": [{ "mtimeOlderThanDays": 90 }],
+      "owner": null,
+      "reason": "Build output and dependencies this project's .gitignore already excludes from source control.",
+      "consequence": "Reinstall or rebuild recreates them (npm install, swift build, cargo build).",
+      "autoCleanEligible": false
+    },
+    {
+      "id": "trash.user",
+      "category": "trash",
+      "level": "safe",
+      "match": ["~/.Trash/**", "/Volumes/*/.Trashes/*/**"],
+      "unit": "file",
+      "predicates": [],
+      "owner": null,
+      "reason": "Items already in the Trash.",
+      "consequence": "Emptying the Trash cannot be undone.",
+      "autoCleanEligible": false
+    },
+    {
+      "id": "duplicates.identical",
+      "category": "duplicates",
+      "level": "review",
+      "match": [],
+      "unit": "file",
+      "predicates": [{ "sizeAtLeastBytes": 1000000 }],
+      "owner": null,
+      "reason": "Byte-identical copy of a file kept elsewhere.",
+      "consequence": "The kept copy remains untouched.",
+      "autoCleanEligible": false
+    },
+    {
+      "id": "largeold.files",
+      "category": "largeOld",
+      "level": "manual",
+      "match": ["~/**"],
+      "unit": "file",
+      "predicates": [
+        { "sizeAtLeastBytes": 500000000 },
+        { "lastOpenedOlderThanDays": 180 }
+      ],
+      "owner": null,
+      "reason": "Large file not opened in six months.",
+      "consequence": "No automatic consequence; this file is yours to judge.",
+      "autoCleanEligible": false
+    }
+  ]
+}

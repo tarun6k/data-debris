@@ -1,0 +1,225 @@
+{
+  "fixtures": [
+    {
+      "ruleID": "appcaches.browser.safari",
+      "positive": [
+        { "path": "~/Library/Caches/com.apple.Safari", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Safari", "isDirectory": true },
+        { "path": "~/Library/Cookies/Cookies.binarycookies" }
+      ]
+    },
+    {
+      "ruleID": "appcaches.browser.chrome",
+      "positive": [
+        { "path": "~/Library/Caches/Google/Chrome/Default/Cache", "isDirectory": true },
+        { "path": "~/Library/Caches/Google/Chrome/Profile 1/Code Cache", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Caches/Google/Chrome/Default/Cookies" },
+        { "path": "~/Library/Application Support/Google/Chrome/Default/Login Data" }
+      ]
+    },
+    {
+      "ruleID": "appcaches.browser.edge",
+      "positive": [
+        { "path": "~/Library/Caches/Microsoft Edge/Default/Cache", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Application Support/Microsoft Edge/Default/Cookies" }
+      ]
+    },
+    {
+      "ruleID": "appcaches.browser.brave",
+      "positive": [
+        { "path": "~/Library/Caches/BraveSoftware/Brave-Browser/Default/GPUCache", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Application Support/BraveSoftware/Brave-Browser/Default/Local Storage", "isDirectory": true }
+      ]
+    },
+    {
+      "ruleID": "appcaches.browser.arc",
+      "positive": [
+        { "path": "~/Library/Caches/Arc/User Data/Default/Cache", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Application Support/Arc/User Data/Default/Cookies" }
+      ]
+    },
+    {
+      "ruleID": "appcaches.browser.firefox",
+      "positive": [
+        { "path": "~/Library/Caches/Firefox/Profiles/abc123.default-release/cache2", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Application Support/Firefox/Profiles/abc123.default-release/places.sqlite" }
+      ]
+    },
+    {
+      "ruleID": "appcaches.media.spotify",
+      "positive": [
+        { "path": "~/Library/Caches/com.spotify.client", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Application Support/Spotify/PersistentCache", "isDirectory": true }
+      ]
+    },
+    {
+      "ruleID": "appcaches.media.slack",
+      "positive": [
+        { "path": "~/Library/Caches/com.tinyspeck.slackmacgap", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Application Support/Slack/Cache", "isDirectory": true }
+      ]
+    },
+    {
+      "ruleID": "appcaches.media.discord",
+      "positive": [
+        { "path": "~/Library/Caches/com.hnc.Discord", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Application Support/discord/Cache", "isDirectory": true }
+      ]
+    },
+    {
+      "ruleID": "appcaches.media.teams",
+      "positive": [
+        { "path": "~/Library/Caches/com.microsoft.teams2", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Containers/com.microsoft.teams2", "isDirectory": true }
+      ]
+    },
+    {
+      "ruleID": "appcaches.media.zoom",
+      "positive": [
+        { "path": "~/Library/Caches/us.zoom.xos", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Application Support/zoom.us/data", "isDirectory": true }
+      ]
+    },
+    {
+      "ruleID": "dev.packagecaches",
+      "positive": [
+        { "path": "~/.npm/_cacache", "isDirectory": true },
+        { "path": "~/.cargo/registry/cache", "isDirectory": true },
+        { "path": "~/Library/Caches/Homebrew", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/.npm", "isDirectory": true },
+        { "path": "~/.cargo/registry", "isDirectory": true }
+      ]
+    },
+    {
+      "ruleID": "appcaches.generic",
+      "positive": [
+        { "path": "~/Library/Caches/com.example.randomapp", "isDirectory": true }
+      ],
+      "negative": [
+        { "path": "~/Library/Application Support/com.example.randomapp/cache", "isDirectory": true },
+        { "path": "~/Library/Caches/com.example.randomapp/Nested", "isDirectory": true }
+      ]
+    },
+    {
+      "ruleID": "logs.diagnosticreports",
+      "positive": [
+        { "path": "~/Library/Logs/DiagnosticReports/MyApp-2025-01-01-093000.ips", "mtimeDaysAgo": 30 }
+      ],
+      "negative": [
+        { "path": "~/Library/Logs/DiagnosticReports/MyApp-yesterday.ips", "mtimeDaysAgo": 2 }
+      ]
+    },
+    {
+      "ruleID": "logs.general",
+      "positive": [
+        { "path": "~/Library/Logs/com.example.randomapp/app.log", "mtimeDaysAgo": 30 }
+      ],
+      "negative": [
+        { "path": "~/Library/Logs/com.example.randomapp/app.log", "mtimeDaysAgo": 1 },
+        { "path": "~/Library/Logs/DiagnosticReports/MyApp-2025-01-01-093000.ips", "mtimeDaysAgo": 30 }
+      ]
+    },
+    {
+      "ruleID": "dev.xcode.deriveddata",
+      "positive": [
+        { "path": "~/Library/Developer/Xcode/DerivedData/MyApp-gxyzabcdefghij", "isDirectory": true, "mtimeDaysAgo": 5 }
+      ],
+      "negative": [
+        { "path": "~/Library/Developer/Xcode/DerivedData/MyApp-gxyzabcdefghij", "isDirectory": true, "mtimeDaysAgo": 0 }
+      ]
+    },
+    {
+      "ruleID": "dev.xcode.devicesupport",
+      "positive": [
+        { "path": "~/Library/Developer/Xcode/iOS DeviceSupport/17.5 (21F79) arm64e", "isDirectory": true, "mtimeDaysAgo": 120 }
+      ],
+      "negative": [
+        { "path": "~/Library/Developer/Xcode/iOS DeviceSupport/26.0 (23A341) arm64e", "isDirectory": true, "mtimeDaysAgo": 10 }
+      ]
+    },
+    {
+      "ruleID": "dev.xcode.archives",
+      "positive": [
+        { "path": "~/Library/Developer/Xcode/Archives/2025-01-15/DataDebris 15-01-25, 10.00.xcarchive", "isDirectory": true, "mtimeDaysAgo": 220 }
+      ],
+      "negative": [
+        { "path": "~/Library/Developer/Xcode/Archives/2025-08-20/DataDebris 20-08-25, 09.00.xcarchive", "isDirectory": true, "mtimeDaysAgo": 25 }
+      ]
+    },
+    {
+      "ruleID": "dev.simulators.runtimes",
+      "positive": [
+        { "path": "~/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 16.4.simruntime", "isDirectory": true, "mtimeDaysAgo": 150 }
+      ],
+      "negative": [
+        { "path": "~/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.0.simruntime", "isDirectory": true, "mtimeDaysAgo": 3 }
+      ]
+    },
+    {
+      "ruleID": "dev.projectbuild",
+      "positive": [
+        { "path": "$TMPREPO/node_modules", "isDirectory": true, "mtimeDaysAgo": 120 },
+        { "path": "$TMPREPO/.build", "isDirectory": true, "mtimeDaysAgo": 120 }
+      ],
+      "negative": [
+        { "path": "$TMPREPO/src", "isDirectory": true, "mtimeDaysAgo": 400 },
+        { "path": "$TMPPLAIN/node_modules", "isDirectory": true, "mtimeDaysAgo": 400 },
+        { "path": "$TMPREPO/node_modules", "isDirectory": true, "mtimeDaysAgo": 10 }
+      ]
+    },
+    {
+      "ruleID": "trash.user",
+      "positive": [
+        { "path": "~/.Trash/old-invoice.pdf", "sizeBytes": 200000 },
+        { "path": "/Volumes/External/.Trashes/501/screenshot.png", "sizeBytes": 900000 }
+      ],
+      "negative": [
+        { "path": "~/Documents/keep-me.pdf", "sizeBytes": 200000 }
+      ]
+    },
+    {
+      "ruleID": "duplicates.identical",
+      "analyzerOnly": true,
+      "positive": [
+        { "path": "~/Documents/Report copy.pdf", "sizeBytes": 5000000 }
+      ],
+      "negative": [
+        { "path": "~/Documents/note.txt", "sizeBytes": 2000 }
+      ]
+    },
+    {
+      "ruleID": "largeold.files",
+      "positive": [
+        { "path": "~/Downloads/old-vm-image.dmg", "sizeBytes": 750000000, "mtimeDaysAgo": 400, "lastOpenedDaysAgo": 300 }
+      ],
+      "negative": [
+        { "path": "~/Downloads/recent-video.mp4", "sizeBytes": 750000000, "mtimeDaysAgo": 400, "lastOpenedDaysAgo": 20 },
+        { "path": "~/Downloads/small-old.txt", "sizeBytes": 1000, "mtimeDaysAgo": 400, "lastOpenedDaysAgo": 300 }
+      ]
+    }
+  ]
+}
