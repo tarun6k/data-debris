@@ -147,6 +147,7 @@ public final class ScanSession: ObservableObject {
 
     @Published public private(set) var categoryProgress: [Category: CategoryProgress]
     @Published public private(set) var bytesFound: Int64 = 0
+    @Published public private(set) var recordCount = 0
     @Published public private(set) var currentPath = ""
     @Published public private(set) var deniedCount = 0
     @Published public private(set) var isScanning = false
@@ -183,6 +184,7 @@ public final class ScanSession: ObservableObject {
 
     private func apply(_ progress: ScanProgress) {
         currentPath = progress.currentPath
+        recordCount = progress.recordCount
         bytesFound = progress.bytesFound
         deniedCount = progress.deniedCount
     }

@@ -215,7 +215,19 @@ final class AppModel: ObservableObject {
     private func scanFinished() {
         scanPoll = nil
         scanStartedAt = nil
+        // Next scan's progress bar is determinate against this count.
+        if let result = session.lastResult, result.status == .complete {
+            UserDefaults.standard.set(result.recordCount, forKey: "lastScanRecordCount")
+        }
         refresh()
+    }
+
+    /// 0…1 against the previous complete scan's record count; nil = first
+    /// scan, show an indeterminate bar.
+    var scanProgressFraction: Double? {
+        let last = UserDefaults.standard.integer(forKey: "lastScanRecordCount")
+        guard last > 0 else { return nil }
+        return min(0.97, Double(session.recordCount) / Double(last))
     }
 
     // MARK: - Selection (writes through to the store, S2)
