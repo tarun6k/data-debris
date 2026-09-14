@@ -26,6 +26,9 @@ struct ResultsView: View {
             if model.scanWasIncomplete {
                 banner("Scan stopped early · Unfinished categories may be missing items")
                     .padding(.bottom, 12)
+            } else if model.cleanedSinceScan {
+                banner("Items were cleaned since this scan · Rescan to refresh the numbers")
+                    .padding(.bottom, 12)
             } else if model.scanIsStale {
                 banner("Scanned more than a day ago · Sizes may have changed")
                     .padding(.bottom, 12)
@@ -140,9 +143,9 @@ struct ResultsView: View {
             Button("Deselect all") { model.deselectAll() }
                 .disabled(model.selectedCount == 0)
             AmountButton(verb: "Review", bytes: model.selectedBytes, ellipsis: true) {
-                // ReviewView is Phase 4B; the gate stays closed until then.
+                model.openReview()
             }
-            .disabled(true)
+            .disabled(!model.canReview)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)

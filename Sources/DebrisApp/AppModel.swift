@@ -31,6 +31,10 @@ final class AppModel: ObservableObject {
     @Published var openCategory: Category?
     @Published var showWelcome: Bool
     @Published var resultSort: ResultSort = .size
+    /// Non-nil while the Review/Cleaning/Done sheet is up — the only gate (S2).
+    @Published var cleanFlow: CleanFlow?
+    /// Set after a clean: the last scan's numbers no longer match the disk.
+    @Published private(set) var cleanedSinceScan = false
 
     @Published private(set) var rows: [CategoryRow] = []
     @Published private(set) var findings: [Finding] = []
@@ -84,6 +88,7 @@ final class AppModel: ObservableObject {
                 exclusions: try ExclusionStore(),
                 catalogue: try Catalogue.bundled())
             _ = try? model.history.recoverInterruptedRuns()
+            _ = try? model.history.pruneExpiredRuns(olderThanDays: Self.historyRetentionDays)
             return model
         } catch {
             fatalError("Cannot open the app's data folder: \(error)")
@@ -97,8 +102,15 @@ final class AppModel: ObservableObject {
     var hasResults: Bool { lastScan != nil && !rows.isEmpty }
 
     var scanIsStale: Bool {
+        if cleanedSinceScan { return true }
         guard let finished = lastScan?.finishedAt else { return false }
         return Date().timeIntervalSince(finished) > 24 * 3600
+    }
+
+    /// The retention control lives in Settings (later phase); History shows it.
+    static var historyRetentionDays: Int {
+        let days = UserDefaults.standard.integer(forKey: "historyRetentionDays")
+        return [30, 90, 365].contains(days) ? days : 90
     }
 
     var scanWasIncomplete: Bool {
@@ -187,6 +199,7 @@ final class AppModel: ObservableObject {
         guard !session.isScanning else { return }
         sidebar = .results
         openCategory = nil
+        cleanedSinceScan = false
         scanStartedAt = Date()
         let runner = ScanRunner(
             scope: ScanScope(),
@@ -258,8 +271,8 @@ final class AppModel: ObservableObject {
         refresh()
     }
 
-    /// Smart Clean: select every safe finding, deselect the rest, go to
-    /// Results. Review is still the only way anything gets cleaned (S2).
+    /// Smart Clean: select every safe finding, deselect the rest, and open
+    /// Review directly. Review is still the only gate (S2).
     func smartClean() {
         let safe = findings.filter { $0.level == .safe && $0.isReclaimable && !isExcluded($0) }
         let rest = findings.filter { $0.level != .safe && $0.isReclaimable }
@@ -268,6 +281,50 @@ final class AppModel: ObservableObject {
         refresh()
         sidebar = .results
         openCategory = nil
+        openReview(entry: .smart)
+    }
+
+    // MARK: - Clean flow (S2: Review is the only gate)
+
+    var canReview: Bool { selectedCount > 0 && !isScanning }
+
+    func openReview(entry: CleanFlow.Entry = .manual) {
+        guard cleanFlow == nil else { return }
+        let selection = findings.filter {
+            selectedIds.contains($0.id) && $0.isReclaimable && !isExcluded($0)
+        }
+        // CleanFlow.init is nil on an empty plan: the sheet never opens on nothing.
+        cleanFlow = CleanFlow(model: self, selection: selection, entry: entry)
+    }
+
+    /// After a run or a restore: fresh gauge, fresh runs, stale-scan banner.
+    func cleanDidFinish() {
+        cleanedSinceScan = true
+        refresh()
+        refreshDisk()
+    }
+
+    /// ⌘Z: restore the most recent run that still has items in the Trash.
+    var lastUndoableRunId: Int64? {
+        // ponytail: availability stats every done item of recent runs; cap at
+        // the last 10 runs so the menu stays instant.
+        for run in ((try? history.runs()) ?? []).prefix(10) {
+            let availability = (try? history.undoAvailability(runId: run.id))
+                ?? .unavailable(.nothingMoved)
+            if case .unavailable = availability { continue }
+            return run.id
+        }
+        return nil
+    }
+
+    func undoLastClean() {
+        guard let runId = lastUndoableRunId else { return }
+        let executor = Executor(history: history)
+        Task {
+            _ = try? await executor.restore(runId: runId)
+            refresh()
+            refreshDisk()
+        }
     }
 
     // MARK: - Exclusions
@@ -327,6 +384,17 @@ final class AppModel: ObservableObject {
         case "scanning":
             showWelcome = false
             Task { self.startScan() }
+        case "review":
+            showWelcome = false
+            sidebar = .results
+            // Give the window a beat to exist before the sheet presents.
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self.openReview()
+            }
+        case "history":
+            showWelcome = false
+            sidebar = .history
         default:
             if route.hasPrefix("detail:"), let category = Category(rawValue: String(route.dropFirst(7))) {
                 showWelcome = false

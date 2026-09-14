@@ -64,6 +64,12 @@ struct ContentView: View {
             } detail: {
                 detail
             }
+            // Review/Cleaning/Done live in one sheet over whatever is behind
+            // it — the only gate to deletion (S2).
+            .sheet(item: $model.cleanFlow) { flow in
+                CleanSheet(flow: flow)
+                    .environmentObject(model)
+            }
         }
     }
 

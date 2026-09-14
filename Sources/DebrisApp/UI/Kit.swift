@@ -195,17 +195,31 @@ struct PathText: View {
 /// title, so it can never be omitted ("Clean 9.7 GB").
 struct AmountButton: View {
     let verb: String
-    let bytes: Int64
+    var bytes: Int64 = 0
+    /// Count-flavoured amount ("Restore 1,318 items"); wins over bytes.
+    var count: Int?
     var ellipsis = false
+    /// Trails the amount: "Delete 9.7 GB permanently".
+    var suffix: String?
+    var destructive = false
     let action: () -> Void
 
-    static func title(verb: String, bytes: Int64, ellipsis: Bool = false) -> String {
-        "\(verb) \(Format.bytes(bytes))" + (ellipsis ? "…" : "")
+    static func title(verb: String, bytes: Int64, ellipsis: Bool = false,
+                      suffix: String? = nil) -> String {
+        var title = "\(verb) \(Format.bytes(bytes))"
+        if let suffix { title += " \(suffix)" }
+        return title + (ellipsis ? "…" : "")
+    }
+
+    static func title(verb: String, count: Int) -> String {
+        "\(verb) \(Format.count(count)) \(count == 1 ? "item" : "items")"
     }
 
     var body: some View {
-        Button(Self.title(verb: verb, bytes: bytes, ellipsis: ellipsis), action: action)
+        let title = count.map { Self.title(verb: verb, count: $0) }
+            ?? Self.title(verb: verb, bytes: bytes, ellipsis: ellipsis, suffix: suffix)
+        Button(title, action: action)
             .buttonStyle(.borderedProminent)
-            .tint(Theme.teal)
+            .tint(destructive ? .red : Theme.teal)
     }
 }
