@@ -830,6 +830,16 @@ final class AppModel: ObservableObject {
 
     /// live() only — tests must never observe system notifications.
     func startLicenseHousekeeping() {
+        #if DEBUG
+        // Live-test hook: age the cached validation stamp so the next
+        // housekeeping pass talks to the worker now instead of in 24 h.
+        if CommandLine.arguments.contains("--age-license"),
+           let (_, stored) = licenseStore.load() {
+            try? licenseStore.save(licenseKey: stored.licenseKey,
+                                   entitlement: stored.entitlement,
+                                   lastValidatedAt: Date(timeIntervalSinceNow: -2 * 86_400))
+        }
+        #endif
         licenseHousekeeping()
         NSWorkspace.shared.notificationCenter
             .publisher(for: NSWorkspace.didWakeNotification)
@@ -866,6 +876,16 @@ final class AppModel: ObservableObject {
         case "duplicates":
             showWelcome = false
             sidebar = .duplicates
+        // Screenshot routes for the purchase sheets. "plan" acknowledges the
+        // privacy sheet (writes settings.json), so only use it with a scratch
+        // HOME — never on a profile whose acknowledgement state matters.
+        case "privacy", "plan":
+            showWelcome = false
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self.startPurchase()
+                if route == "plan" { self.purchase?.acknowledgePrivacy() }
+            }
         default:
             if route.hasPrefix("detail:"), let category = Category(rawValue: String(route.dropFirst(7))) {
                 showWelcome = false
