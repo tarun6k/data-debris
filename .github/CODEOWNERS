@@ -1,0 +1,9 @@
+# Every change needs the owner's review.
+* @tarun6k
+
+# The parts where a mistake deletes someone's files or leaks a key.
+/Sources/DebrisCore/           @tarun6k
+/Sources/DebrisApp/Purchase/   @tarun6k
+/services/license-worker/      @tarun6k
+/docs/product-spec.md          @tarun6k
+/CLAUDE.md                     @tarun6k

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security or data-loss report
+    url: https://github.com/tarun6k/data-debris/security/advisories/new
+    about: Report privately — never in a public issue. See SECURITY.md.
+  - name: Product and UI specs
+    url: https://github.com/tarun6k/data-debris/blob/main/docs/product-spec.md
+    about: The authoritative spec. Check here before proposing behaviour changes.

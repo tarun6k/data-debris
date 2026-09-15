@@ -1,0 +1,21 @@
+Copyright (c) 2026 Tarun Kumar. All rights reserved.
+
+Data Debris, including its source code, documentation, designs and assets in this
+repository, is proprietary and confidential.
+
+No permission is granted to use, copy, modify, merge, publish, distribute, sublicense,
+sell, or create derivative works from any part of this software, in source or binary form,
+without the prior written permission of the copyright holder.
+
+Use of the compiled application is governed separately by the end-user licence terms
+presented in the application at purchase, not by this file.
+
+Third-party components remain under their own licences, including GRDB (MIT) and
+Sparkle (MIT).
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.

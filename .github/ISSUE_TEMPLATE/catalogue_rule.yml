@@ -1,0 +1,66 @@
+name: Catalogue rule
+description: Propose a new thing to detect, or fix a rule that claims too much
+labels: [catalogue]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A rule decides what the app is willing to touch, so it needs to be
+        specific. **If it is unclear whether a path is safe to remove, it is
+        not** — it should stay `unknown`.
+
+  - type: input
+    id: what
+    attributes:
+      label: What should be detected
+      placeholder: "Xcode DerivedData, Docker overlay2 layers, …"
+    validations:
+      required: true
+
+  - type: textarea
+    id: paths
+    attributes:
+      label: Paths and glob
+      description: Where it lives, and how you would match it.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Why removing it is safe
+      description: >
+        What regenerates it, and what the user loses in the meantime (a slow
+        first build is a cost worth naming). Name anything it must never match.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auto-clean
+    attributes:
+      label: Auto Clean eligible?
+      description: >
+        Only regenerating caches and logs qualify. New rules ship unticked
+        regardless (S9).
+      options:
+        - "No"
+        - "Yes — regenerating cache or log"
+    validations:
+      required: true
+
+  - type: input
+    id: size
+    attributes:
+      label: Typical size reclaimed
+      placeholder: "2-40 GB on a developer Mac"
+
+  - type: checkboxes
+    id: confirms
+    attributes:
+      label: Checks
+      options:
+        - label: This is not inside a protected path (/System, app bundles, Photos/Mail/Final Cut libraries, VCS working trees, …)
+          required: true
+        - label: Removing it loses no user-created data
+          required: true
