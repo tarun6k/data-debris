@@ -154,7 +154,7 @@ struct SettingsView: View {
             Button("How this app treats your Mac") { showingPrivacySheet = true }
             HStack(spacing: 10) {
                 ForEach(LegalDocument.allCases) { document in
-                    Button(document.linkTitle) { legalDocument = document }
+                    Button(model.privacyText.copy.linkLabel(document)) { legalDocument = document }
                 }
             }
         }

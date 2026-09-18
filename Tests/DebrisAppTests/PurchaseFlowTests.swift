@@ -134,9 +134,19 @@ final class PurchaseFlowTests: XCTestCase {
         XCTAssertEqual(model.purchase?.step, .plan, "same text: sheet skipped")
         model.purchase?.cancel()
 
-        // Same settings.json, changed sheet text → shown again.
-        let changed = try makeModel(
+        // Same settings.json, worker moved → still acknowledged, sheet skipped.
+        let moved = try makeModel(
             privacyText: PrivacySheetText(updateHost: "u.example", licenseHost: "changed.example"))
+        XCTAssertTrue(moved.privacyAcknowledged)
+        moved.startPurchase()
+        XCTAssertEqual(moved.purchase?.step, .plan)
+        moved.purchase?.cancel()
+
+        // Same settings.json, a sentence changed → shown again.
+        var copy = PrivacySheetText.Copy.current
+        copy.paymentBody += " Prices include VAT where it applies."
+        let changed = try makeModel(
+            privacyText: PrivacySheetText(copy: copy, updateHost: "u.example", licenseHost: "l.example"))
         XCTAssertFalse(changed.privacyAcknowledged)
         changed.startPurchase()
         XCTAssertEqual(changed.purchase?.step, .privacy)

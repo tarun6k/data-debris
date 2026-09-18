@@ -33,16 +33,43 @@ final class PrivacySheetTests: XCTestCase {
         XCTAssertTrue(PrivacySecuritySheet.continueEnabled(scrolledToEnd: true, ticked: true))
     }
 
-    /// Any copy change — even one hostname — changes the hash, which re-shows
-    /// the sheet once (the model check is in PurchaseFlowTests).
-    func testHashChangesWhenAnyStringChanges() {
+    /// The hash covers the copy only: moving the worker or the update feed
+    /// changes what is rendered but not the acknowledgement.
+    func testHashIgnoresHostnames() {
         let sameText = PrivacySheetText(updateHost: "updates.datadebris.app",
                                         licenseHost: "license.datadebris.app")
         XCTAssertEqual(text.textHash, sameText.textHash)
-        let changed = PrivacySheetText(updateHost: "updates.datadebris.app",
-                                       licenseHost: "other.example")
-        XCTAssertNotEqual(text.textHash, changed.textHash)
         XCTAssertEqual(text.textHash.count, 64)
+
+        let moved = PrivacySheetText(updateHost: "u.example", licenseHost: "other.example")
+        XCTAssertEqual(text.textHash, moved.textHash)
+        XCTAssertNotEqual(text.allStrings, moved.allStrings, "the rendered text did change")
+        XCTAssertTrue(moved.allStrings.joined().contains("other.example"))
+        for string in text.hashedStrings {
+            XCTAssertFalse(string.contains("datadebris.app"), "hostname in hash input: \(string)")
+            XCTAssertFalse(string.contains("https://"), "URL in hash input: \(string)")
+        }
+    }
+
+    /// Any change to a sentence, a pill or a link label changes the hash,
+    /// which re-shows the sheet once (the model check is in PurchaseFlowTests).
+    func testHashChangesWhenASentenceChanges() {
+        var sentence = PrivacySheetText.Copy.current
+        sentence.deletionBody += " Nothing is ever shredded."
+        XCTAssertNotEqual(text.textHash, PrivacySheetText(copy: sentence).textHash)
+
+        var pill = PrivacySheetText.Copy.current
+        pill.paymentPill = "Refund"
+        XCTAssertNotEqual(text.textHash, PrivacySheetText(copy: pill).textHash)
+
+        var label = PrivacySheetText.Copy.current
+        label.securityLink = "Security"
+        XCTAssertNotEqual(text.textHash, PrivacySheetText(copy: label).textHash)
+
+        var network = PrivacySheetText.Copy.current
+        network.networkBody = network.networkBody.replacingOccurrences(
+            of: "No telemetry by default.", with: "No telemetry.")
+        XCTAssertNotEqual(text.textHash, PrivacySheetText(copy: network).textHash)
     }
 
     /// The fixed section order and the exact copy the task specifies.
@@ -52,6 +79,9 @@ final class PrivacySheetTests: XCTestCase {
         ])
         XCTAssertEqual(text.sections.map(\.pill), ["Scope", "Private", "Reversible", "Refundable"])
         XCTAssertEqual(text.sections[0].link, "See the never-touch list")
+        XCTAssertEqual(text.linksRow,
+                       "Privacy Policy · Terms · Security page — also available offline under About")
+        XCTAssertFalse(text.sections[1].body.contains("{"), "placeholders must be filled")
         XCTAssertTrue(text.sections[3].body.hasPrefix("Handled by Paddle, our payment provider"))
         XCTAssertTrue(text.sections[2].body.contains("no admin password, ever"))
         for string in text.allStrings {

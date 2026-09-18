@@ -2,9 +2,10 @@ import DebrisCore
 import Network
 import SwiftUI
 
-/// Screen 12 — shown before any price, every word hashed into the
-/// acknowledgement. Continue unlocks only when the ScrollView has reached the
-/// bottom AND the box is ticked. No price, no countdown, no pre-tick, no skip.
+/// Screen 12 — shown before any price, its copy hashed into the
+/// acknowledgement (see PrivacySheetText). Continue unlocks only when the
+/// ScrollView has reached the bottom AND the box is ticked. No price, no
+/// countdown, no pre-tick, no skip.
 struct PrivacySecuritySheet: View {
 
     let text: PrivacySheetText
@@ -107,11 +108,11 @@ struct PrivacySecuritySheet: View {
         HStack(spacing: 4) {
             ForEach(Array(LegalDocument.allCases.enumerated()), id: \.element) { index, document in
                 if index > 0 { Text("·").foregroundStyle(.secondary) }
-                Button(document.linkTitle) { open(document) }
+                Button(text.copy.linkLabel(document)) { open(document) }
                     .buttonStyle(.plain)
                     .foregroundStyle(Theme.teal)
             }
-            Text("— also available offline under About")
+            Text(text.copy.linksSuffix)
                 .foregroundStyle(.secondary)
             Spacer()
         }
@@ -197,14 +198,6 @@ enum LegalDocument: String, CaseIterable, Identifiable {
     case security
 
     var id: String { rawValue }
-
-    var linkTitle: String {
-        switch self {
-        case .privacyPolicy: return "Privacy Policy"
-        case .terms: return "Terms"
-        case .security: return "Security page"
-        }
-    }
 
     var title: String {
         switch self {
