@@ -79,6 +79,8 @@ extension AppModel {
 
     func applyDriveIfRequested() {
         applyAutoCleanDriveIfRequested()
+        applyPurchaseDriveIfRequested()
+        applyLicenseDriveIfRequested()
         let args = CommandLine.arguments
         guard let index = args.firstIndex(of: "--drive-clean"),
               args.indices.contains(index + 1) else { return }

@@ -37,6 +37,13 @@ npm run dev         # wrangler dev with local KV; reads .dev.vars
 from the repo-root `.env` — same variable names — plus the two worker-only
 ones below.
 
+Live pass against `wrangler dev` (Paddle cannot reach 127.0.0.1, so a script
+plays the courier): `scripts/relay-transaction.mjs <reference> [--wait s]`
+fetches the real sandbox transaction by its checkout reference and delivers
+it signed to the local webhook; `scripts/simulate-checkout.mjs` fabricates
+one when there is no real checkout. Both read `.dev.vars` in-process and
+print keys cut to their last 4 characters.
+
 ## Secrets — never in this repo
 
 Set for each environment with `wrangler secret put <NAME> --env sandbox|production`:
