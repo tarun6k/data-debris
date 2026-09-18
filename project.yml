@@ -85,6 +85,10 @@ targets:
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: 1
         GENERATE_INFOPLIST_FILE: YES
+        # Resources/Assets.xcassets/AppIcon.appiconset, generated from
+        # docs/design/AppIcon.png by scripts/make-icon.sh. actool also emits
+        # Contents/Resources/AppIcon.icns, which make-dmg.sh reuses for the volume.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         # "Empty Trash" asks Finder to do it, so Finder shows its own progress.
