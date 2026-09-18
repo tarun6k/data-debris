@@ -1,6 +1,7 @@
 import AppKit
 import DebrisCore
 import Foundation
+import Security
 
 #if DEBUG
 /// Phase 7B live pass. Both routes go through the exact methods the buttons
@@ -67,6 +68,34 @@ extension AppModel {
 
     private func describeState() -> String {
         "entitlement \(entitlementState) · require(.clean) \(entitlements.require(.clean))"
+    }
+
+    /// Reads the license item the way LicenseStore does, one stage at a time,
+    /// so a failure names its stage: Keychain status, decode, or signature.
+    private func driveKeychainDiagnostics() {
+        let service = KeychainSecretStore.service
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: "license",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else {
+            drive("keychain \(service): SecItemCopyMatching status \(status)")
+            return
+        }
+        guard let stored = try? JSONDecoder().decode(LicenseStore.Stored.self, from: data) else {
+            drive("keychain \(service): \(data.count) bytes, Stored decode FAILED")
+            return
+        }
+        let payload = SignedEntitlement.verify(stored.entitlement)
+        drive("keychain \(service): \(data.count) bytes · key …\(stored.licenseKey.suffix(4))"
+            + " · lastValidatedAt \(Self.driveClock.string(from: stored.lastValidatedAt))"
+            + " · signature \(payload == nil ? "INVALID" : "valid")"
+            + " · machines \(payload?.machines.map(\.name) ?? [])")
     }
 
     private func driveScanAndSelect(marker: String) async {
@@ -185,6 +214,7 @@ extension AppModel {
         Task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             await driveAwaitValidate()
+            driveKeychainDiagnostics()
             drive("launch — \(describeState()) · autoClean enabled \(autoCleanConfig.enabled)")
             sidebar = .home
             await driveShot(shots, "home.png", settle: 1_000_000_000)
@@ -211,6 +241,7 @@ extension AppModel {
                 drive("toast: \(licenseToast ?? "none")")
                 drive(describeState())
                 await driveShot(shots, "reactivated.png", settle: 1_000_000_000)
+                driveKeychainDiagnostics()
             } else if command.hasPrefix("lapse-check:") {
                 let marker = String(command.dropFirst("lapse-check:".count))
                 let runs = (try? history.runs()) ?? []
@@ -236,6 +267,17 @@ extension AppModel {
                 drive("Review opened \(cleanFlow != nil) · purchase sheet \(purchase.map { describe($0.step) } ?? "none") — Clean is \(locked ? "LOCKED" : "NOT LOCKED")")
                 await driveShot(shots, "review-attempt.png", settle: 1_200_000_000)
                 purchase?.cancel()
+            } else if command == "keychain-probe" {
+                let probe = KeychainSecretStore(account: "probe")
+                do {
+                    try probe.write(Data("probe \(Date())".utf8))
+                    drive("probe write ok")
+                } catch {
+                    drive("probe write FAILED \(error)")
+                }
+                drive("probe read \(probe.read().map { "\($0.count) bytes" } ?? "nil")")
+                probe.delete()
+                drive("probe read after delete \(probe.read().map { "\($0.count) bytes" } ?? "nil")")
             } else if command != "status" {
                 drive("FAILED — unknown command \(command)")
             }
