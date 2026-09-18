@@ -23,18 +23,29 @@ enum Snapshot {
         guard let index = args.firstIndex(of: "--snapshot"), args.indices.contains(index + 1) else { return }
         let path = args[index + 1]
         let delay = args.indices.contains(index + 2) ? Double(args[index + 2]) ?? 3 : 3
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay - 0.5) {
+        // Runs before every capture attempt, so a slow launch cannot miss it.
+        func prepare() {
             NSApp.activate(ignoringOtherApps: true) // active-window chrome
             if args.contains("--dark") { NSApp.appearance = NSAppearance(named: .darkAqua) }
-            // Match the design PNG canvas so shots compare 1:1.
-            NSApp.windows.first { $0.isVisible }?
-                .setContentSize(NSSize(width: 1200, height: 800))
+            // Match the design PNG canvas so shots compare 1:1; `--tall`
+            // for screens that scroll (Settings).
+            let window = NSApp.windows.first { $0.isVisible }
+            window?.setContentSize(NSSize(width: 1200, height: args.contains("--tall") ? 1500 : 800))
+            // `--scroll-end`: show the bottom of a scrolling screen (Settings > About).
+            if args.contains("--scroll-end"), let content = window?.contentView {
+                for scroll in scrollViews(in: content) {
+                    guard let document = scroll.documentView else { continue }
+                    scroll.contentView.scroll(to: NSPoint(x: 0, y: max(0, document.frame.height - scroll.contentSize.height)))
+                    scroll.reflectScrolledClipView(scroll.contentView)
+                }
+            }
         }
         // The window can lag launch when the app starts unfocused; retry until
         // one is up rather than racing it with a fixed delay.
         var attempts = 0
         func tryCapture() {
             attempts += 1
+            prepare()
             if capture(to: path) {
                 FileHandle.standardError.write(Data("SNAPSHOT: written after \(attempts) attempts\n".utf8))
                 if args.contains("--quit") { quit() }
@@ -48,6 +59,9 @@ enum Snapshot {
         // `--quit`: a routed run has nothing to save (scratch profile), and a
         // presented sheet can hold up NSApp.terminate, so exit outright.
         func quit() -> Never { exit(0) }
+        func scrollViews(in view: NSView) -> [NSScrollView] {
+            (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrollViews(in: $0) }
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { tryCapture() }
     }
 }

@@ -934,6 +934,7 @@ final class AppModel: ObservableObject {
             showWelcome = false; sidebar = .home
             moveOffer = MoveOffer(destination: URL(fileURLWithPath: "/Applications/DataDebris.app"))
         case "moved-fda-lost": showWelcome = false; sidebar = .home; movedNotice = .fdaLost
+        case "about": showWelcome = false; sidebar = .settings
         case "whats-new":
             showWelcome = false; sidebar = .home
             catalogueChanges = CatalogueChanges(

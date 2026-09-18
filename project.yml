@@ -78,6 +78,12 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tarunkumar.datadebris
         PRODUCT_NAME: DataDebris
+        # CFBundleShortVersionString / CFBundleVersion come from these two
+        # (the generated plist drops the keys when they are unset). Sparkle
+        # compares CFBundleVersion, so bump CURRENT_PROJECT_VERSION on every
+        # release; scripts/build-release.sh refuses to run otherwise.
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
         INFOPLIST_KEY_NSHumanReadableCopyright: ""

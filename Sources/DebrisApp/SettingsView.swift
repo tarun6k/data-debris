@@ -13,6 +13,8 @@ struct SettingsView: View {
 
     @State private var showingLicenseEntry = false
     @State private var showingPrivacySheet = false
+    @State private var showingProtections = false
+    @State private var showingAcknowledgements = false
     @State private var legalDocument: LegalDocument?
     @State private var confirmingDeactivate = false
 
@@ -23,7 +25,13 @@ struct SettingsView: View {
             }
             licenseSection
             protectionsSection
-            aboutSection
+            AboutSection(
+                config: AppConfig.current,
+                onPrivacySheet: { showingPrivacySheet = true },
+                onProtections: { showingProtections = true },
+                onAcknowledgements: { showingAcknowledgements = true },
+                onLegal: { legalDocument = $0 },
+                linkLabel: { model.privacyText.copy.linkLabel($0) })
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
@@ -38,6 +46,8 @@ struct SettingsView: View {
                                  onNotNow: { showingPrivacySheet = false })
         }
         .sheet(item: $legalDocument) { LegalSheet(document: $0) }
+        .sheet(isPresented: $showingProtections) { ProtectionsSheet() }
+        .sheet(isPresented: $showingAcknowledgements) { AcknowledgementsSheet() }
         .confirmationDialog("Deactivate this Mac?",
                             isPresented: $confirmingDeactivate) {
             Button("Deactivate — cleaning locks on this Mac", role: .destructive) {
@@ -162,19 +172,6 @@ struct SettingsView: View {
     }
 
     // MARK: - About
-
-    private var aboutSection: some View {
-        Section("About") {
-            row("Version", Bundle.main.infoDictionary?["CFBundleShortVersionString"]
-                as? String ?? "dev")
-            Button("How this app treats your Mac") { showingPrivacySheet = true }
-            HStack(spacing: 10) {
-                ForEach(LegalDocument.allCases) { document in
-                    Button(model.privacyText.copy.linkLabel(document)) { legalDocument = document }
-                }
-            }
-        }
-    }
 
     private func row(_ label: String, _ value: String) -> some View {
         HStack {
