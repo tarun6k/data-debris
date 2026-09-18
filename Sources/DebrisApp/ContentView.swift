@@ -38,45 +38,61 @@ struct ContentView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        if model.showWelcome {
-            WelcomeView()
-        } else {
-            NavigationSplitView {
-                List(selection: $model.sidebar) {
-                    Section("Data Debris") {
-                        ForEach(SidebarItem.allCases) { item in
-                            // Results and Duplicates need a scan first; an
-                            // untagged row cannot be selected (macOS 13 has
-                            // no .selectionDisabled).
-                            if (item == .results || item == .duplicates)
-                                && model.lastScan == nil && !model.isScanning {
-                                Label(item.title, systemImage: item.systemImage)
-                                    .foregroundStyle(.tertiary)
-                            } else {
-                                Label(item.title, systemImage: item.systemImage)
-                                    .tag(item)
-                            }
+        Group {
+            if model.showWelcome {
+                WelcomeView()
+            } else {
+                mainWindow
+            }
+        }
+        // Before any Full Disk Access request: TCC ties the grant to the
+        // app's location, so an app outside Applications is moved first.
+        .sheet(item: $model.moveOffer) { offer in
+            MoveToApplicationsSheet(destination: offer.destination)
+                .environmentObject(model)
+        }
+        .sheet(item: $model.movedNotice) { _ in
+            MovedNoticeSheet()
+                .environmentObject(model)
+        }
+    }
+
+    private var mainWindow: some View {
+        NavigationSplitView {
+            List(selection: $model.sidebar) {
+                Section("Data Debris") {
+                    ForEach(SidebarItem.allCases) { item in
+                        // Results and Duplicates need a scan first; an
+                        // untagged row cannot be selected (macOS 13 has
+                        // no .selectionDisabled).
+                        if (item == .results || item == .duplicates)
+                            && model.lastScan == nil && !model.isScanning {
+                            Label(item.title, systemImage: item.systemImage)
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            Label(item.title, systemImage: item.systemImage)
+                                .tag(item)
                         }
                     }
                 }
-                .listStyle(.sidebar)
-                .navigationSplitViewColumnWidth(200)
-            } detail: {
-                detail
             }
-            // Review/Cleaning/Done live in one sheet over whatever is behind
-            // it — the only gate to deletion (S2).
-            .sheet(item: $model.cleanFlow) { flow in
-                CleanSheet(flow: flow)
-                    .environmentObject(model)
-            }
-            // Privacy → plan → checkout, one sheet; Esc anywhere = cancel.
-            .sheet(item: purchaseBinding) { flow in
-                PurchaseSheet(flow: flow)
-                    .environmentObject(model)
-            }
-            .overlay(alignment: .bottom) { licenseToast }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(200)
+        } detail: {
+            detail
         }
+        // Review/Cleaning/Done live in one sheet over whatever is behind
+        // it — the only gate to deletion (S2).
+        .sheet(item: $model.cleanFlow) { flow in
+            CleanSheet(flow: flow)
+                .environmentObject(model)
+        }
+        // Privacy → plan → checkout, one sheet; Esc anywhere = cancel.
+        .sheet(item: purchaseBinding) { flow in
+            PurchaseSheet(flow: flow)
+                .environmentObject(model)
+        }
+        .overlay(alignment: .bottom) { licenseToast }
     }
 
     /// Dismissing the sheet by any route (Esc, close) cancels the flow, so

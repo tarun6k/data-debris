@@ -87,7 +87,7 @@ struct HomeView: View {
         HStack {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
-            Text("Some caches hidden · Grant access")
+            Text("Some caches hidden · Full Disk Access not granted")
                 .font(.system(size: 12))
             Spacer()
             Button("Open System Settings") { FullDiskAccess.openSettings() }

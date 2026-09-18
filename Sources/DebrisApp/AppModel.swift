@@ -59,7 +59,14 @@ final class AppModel: ObservableObject {
     @Published private(set) var lastScan: ScanInfo?
     @Published private(set) var recentRuns: [RunRecord] = []
     @Published private(set) var disk: DiskSnapshot?
-    @Published private(set) var fdaGranted = FullDiskAccess.granted
+    @Published private(set) var fdaGranted: Bool
+    /// Non-nil while the "Move to Applications" sheet is up; shown before
+    /// any Full Disk Access request and again on every launch until moved.
+    @Published var moveOffer: MoveOffer?
+    /// The freshly moved copy lost the grant: one sentence + Settings link.
+    @Published var movedNotice: MovedNotice?
+    struct MoveOffer: Identifiable { let destination: URL; var id: String { destination.path } }
+    enum MovedNotice: String, Identifiable { case fdaLost; var id: String { rawValue } }
     @Published private(set) var scanStartedAt: Date?
 
     /// Set by "Never touch selected" so the toast can undo the whole batch.
@@ -86,8 +93,9 @@ final class AppModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private var scanPoll: AnyCancellable?
 
-    private static let welcomeCompletedKey = "welcomeCompleted"
-    private static let fdaWasGrantedKey = "fdaWasGranted"
+    static let welcomeCompletedKey = "welcomeCompleted"
+    static let fdaWasGrantedKey = "fdaWasGranted"
+    private let fdaProbe: () -> Bool
 
     init(store: FindingsStore, history: HistoryStore, exclusions: ExclusionStore,
          catalogue: Catalogue, autoCleanConfigURL: URL? = nil,
@@ -95,9 +103,15 @@ final class AppModel: ObservableObject {
          licenseStore: LicenseStore? = nil,
          licenseService: LicenseService? = nil,
          privacyText: PrivacySheetText? = nil,
-         clock: Clock = SystemClock()) {
+         clock: Clock = SystemClock(),
+         fdaProbe: @escaping () -> Bool = { FullDiskAccess.granted },
+         moveDecision: MoveToApplications.Decision = .notABundle,
+         justMoved: Bool = false) {
         self.store = store
         self.clock = clock
+        self.fdaProbe = fdaProbe
+        let granted = fdaProbe()
+        self.fdaGranted = granted
         self.history = history
         self.exclusions = exclusions
         self.catalogue = catalogue
@@ -114,10 +128,16 @@ final class AppModel: ObservableObject {
         entitlementState = entitlements.state
 
         let defaults = AppPaths.userDefaults
-        // First launch, or FDA revoked after we once saw it granted.
+        let wasGranted = defaults.bool(forKey: Self.fdaWasGrantedKey)
+        // First launch, or FDA revoked after we once saw it granted. A move
+        // that lost the grant gets the one-sentence notice instead.
         showWelcome = !defaults.bool(forKey: Self.welcomeCompletedKey)
-            || (defaults.bool(forKey: Self.fdaWasGrantedKey) && !FullDiskAccess.granted)
-        if FullDiskAccess.granted { defaults.set(true, forKey: Self.fdaWasGrantedKey) }
+            || (wasGranted && !granted && !justMoved)
+        if justMoved && wasGranted && !granted { movedNotice = .fdaLost }
+        if case .offer(let destination) = moveDecision {
+            moveOffer = MoveOffer(destination: destination)
+        }
+        if granted { defaults.set(true, forKey: Self.fdaWasGrantedKey) }
 
         session.$isScanning
             .dropFirst()
@@ -144,13 +164,15 @@ final class AppModel: ObservableObject {
     }
 
     static func live() -> AppModel {
-        MoveToApplications.removeOldCopyIfPending()
+        let justMoved = MoveToApplications.removeOldCopyIfPending()
         do {
             let model = AppModel(
                 store: try FindingsStore(),
                 history: try HistoryStore(),
                 exclusions: try ExclusionStore(),
-                catalogue: try Catalogue.bundled())
+                catalogue: try Catalogue.bundled(),
+                moveDecision: MoveToApplications.current,
+                justMoved: justMoved)
             _ = try? model.history.recoverInterruptedRuns()
             _ = try? model.history.pruneExpiredRuns(olderThanDays: Self.historyRetentionDays)
             // The agent points at the binary by absolute path; heal it if the
@@ -265,9 +287,16 @@ final class AppModel: ObservableObject {
         Task { disk = await DiskUsage.refresh() }
     }
 
+    /// Launch, wake and every scan re-probe; a revocation mid-session shows
+    /// the Home banner only (never a prompt, never on a timer).
     func recheckFDA() {
-        fdaGranted = FullDiskAccess.granted
+        fdaGranted = fdaProbe()
         if fdaGranted { AppPaths.userDefaults.set(true, forKey: Self.fdaWasGrantedKey) }
+    }
+
+    func systemDidWake() {
+        recheckFDA()
+        licenseHousekeeping()
     }
 
     func completeWelcome() {
@@ -409,6 +438,7 @@ final class AppModel: ObservableObject {
 
     func startScan() {
         guard !session.isScanning else { return }
+        recheckFDA()
         sidebar = .results
         openCategory = nil
         cleanedSinceScan = false
@@ -850,7 +880,7 @@ final class AppModel: ObservableObject {
         NSWorkspace.shared.notificationCenter
             .publisher(for: NSWorkspace.didWakeNotification)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.licenseHousekeeping() }
+            .sink { [weak self] _ in self?.systemDidWake() }
             .store(in: &cancellables)
     }
 
@@ -863,6 +893,10 @@ final class AppModel: ObservableObject {
         let route = CommandLine.arguments[index + 1]
         switch route {
         case "welcome": showWelcome = true
+        case "move-offer":
+            showWelcome = false; sidebar = .home
+            moveOffer = MoveOffer(destination: URL(fileURLWithPath: "/Applications/DataDebris.app"))
+        case "moved-fda-lost": showWelcome = false; sidebar = .home; movedNotice = .fdaLost
         case "home": showWelcome = false; sidebar = .home
         case "results": showWelcome = false; sidebar = .results
         case "scanning":

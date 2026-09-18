@@ -14,7 +14,6 @@ struct WelcomeView: View {
         #endif
         return 0
     }()
-    @State private var declinedMove = false
 
     private let fdaPoll = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
@@ -69,47 +68,35 @@ struct WelcomeView: View {
             title: "Reclaim space. Keep control.",
             subtitle: "We show you everything before it goes. Deleted files go to Trash, not oblivion."
         ) {
-            if MoveToApplications.shouldOffer && !declinedMove {
-                // TCC ties FDA to the app's location, so move first.
-                card(
-                    title: "Move to Applications",
-                    body: Text("macOS ties Full Disk Access to where the app lives, so moving it later would reset the permission."),
-                    pill: nil)
-                HStack(spacing: 12) {
-                    Button("Move to Applications") { MoveToApplications.moveAndRelaunch() }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.teal)
-                    Button("Not now") { declinedMove = true }
-                }
-            } else {
-                card(
-                    title: "Full Disk Access",
-                    body: fdaBody,
-                    pill: (model.fdaGranted ? "Granted" : "Not granted",
-                           model.fdaGranted ? Color.green : Color.orange))
-                HStack(spacing: 12) {
-                    if model.fdaGranted {
-                        Button("Start scanning") {
-                            model.completeWelcome()
-                            model.startScan()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.teal)
-                    } else {
-                        Button("Open System Settings") { FullDiskAccess.openSettings() }
-                            .buttonStyle(.borderedProminent)
-                            .tint(Theme.teal)
-                        Button("Continue with limited access") { model.completeWelcome() }
+            // The Move-to-Applications sheet (ContentView) runs before this
+            // step, so the grant lands on the app's final location.
+            card(
+                title: "Full Disk Access",
+                body: fdaBody,
+                pill: (model.fdaGranted ? "Granted" : "Not granted",
+                       model.fdaGranted ? Color.green : Color.orange))
+            HStack(spacing: 12) {
+                if model.fdaGranted {
+                    Button("Start scanning") {
+                        model.completeWelcome()
+                        model.startScan()
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.teal)
+                } else {
+                    Button("Open System Settings") { FullDiskAccess.openSettings() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.teal)
+                    Button("Continue with limited access") { model.completeWelcome() }
                 }
             }
         }
     }
 
     private var fdaBody: Text {
-        Text("Needed to see app caches in ")
+        Text("Lets the app read the parts of ")
             + Text("~/Library").font(.system(size: 12, design: .monospaced))
-            + Text(" and developer folders. Without it we scan only your home folder.")
+            + Text(" that macOS protects, such as Safari and Mail caches. Without it those stay hidden; the rest of your home folder is still scanned.")
     }
 
     // MARK: - Pieces
