@@ -98,6 +98,14 @@ struct DataDebrisApp: App {
                 Button("Check for updates…") { updates.checkForUpdates() }
                     .disabled(!updates.canCheck)
             }
+            CommandGroup(after: .help) {
+                Button("Report a problem…") { model.problemReport = .problem }
+                    .disabled(model.showWelcome)
+                if model.betaFeedbackVisible {
+                    Button("Beta feedback…") { model.problemReport = .betaFeedback }
+                        .disabled(model.showWelcome)
+                }
+            }
             CommandGroup(after: .newItem) {
                 Button("Scan Now") { model.startScan() }
                     .keyboardShortcut("r")

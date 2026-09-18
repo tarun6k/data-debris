@@ -70,6 +70,8 @@ final class AppModel: ObservableObject {
     /// "What's new in the catalogue" after an update; waits behind the move
     /// sheets so only one sheet is ever up.
     @Published var catalogueChanges: CatalogueChanges?
+    /// Non-nil while the Report a problem / Beta feedback sheet is up.
+    @Published var problemReport: ProblemReport.Kind?
     private var pendingCatalogueChanges: CatalogueChanges?
     @Published private(set) var scanStartedAt: Date?
 
@@ -726,6 +728,23 @@ final class AppModel: ObservableObject {
         entitlementState = entitlements.state
     }
 
+    // MARK: - Support
+
+    static let betaFeedbackKey = "betaFeedback"
+
+    var betaFeedbackVisible: Bool {
+        #if DEBUG
+        return true
+        #else
+        return AppPaths.userDefaults.bool(forKey: Self.betaFeedbackKey)
+        #endif
+    }
+
+    func problemReport(kind: ProblemReport.Kind) -> ProblemReport {
+        ProblemReport.gather(kind: kind, history: history, entitlement: entitlementState,
+                             fdaGranted: fdaGranted)
+    }
+
     #if DEBUG
     /// Settings > License in Debug builds only: forget the Keychain item this
     /// build can see (`AppPaths.keychainService`, ".debug" under a routed
@@ -934,6 +953,7 @@ final class AppModel: ObservableObject {
             showWelcome = false; sidebar = .home
             moveOffer = MoveOffer(destination: URL(fileURLWithPath: "/Applications/DataDebris.app"))
         case "moved-fda-lost": showWelcome = false; sidebar = .home; movedNotice = .fdaLost
+        case "report-problem": showWelcome = false; sidebar = .settings; problemReport = .problem
         case "about": showWelcome = false; sidebar = .settings
         case "whats-new":
             showWelcome = false; sidebar = .home

@@ -25,6 +25,7 @@ struct SettingsView: View {
             }
             licenseSection
             protectionsSection
+            helpSection
             AboutSection(
                 config: AppConfig.current,
                 onPrivacySheet: { showingPrivacySheet = true },
@@ -172,6 +173,22 @@ struct SettingsView: View {
     }
 
     // MARK: - About
+
+    /// "Beta feedback" is hidden unless this is a Debug build or the
+    /// `betaFeedback` default is set (`defaults write <suite> betaFeedback 1`).
+    private var helpSection: some View {
+        Section("Help") {
+            HStack(spacing: 10) {
+                Button("Report a problem…") { model.problemReport = .problem }
+                if model.betaFeedbackVisible {
+                    Button("Beta feedback…") { model.problemReport = .betaFeedback }
+                }
+            }
+            Text("Shows you the whole report first; sending happens in your mail app.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+    }
 
     private func row(_ label: String, _ value: String) -> some View {
         HStack {

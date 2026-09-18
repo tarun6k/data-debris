@@ -61,6 +61,10 @@ struct ContentView: View {
                     .environmentObject(model)
             }
         }
+        .sheet(item: $model.problemReport) { kind in
+            ReportProblemSheet(kind: kind)
+                .environmentObject(model)
+        }
     }
 
     private var catalogueChangesBinding: Binding<Bool> {
