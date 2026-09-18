@@ -20,8 +20,12 @@
 		<string>https://sandbox-customer-portal.paddle.com/</string>
 		<key>UpdateHost</key>
 		<string>updates.datadebris.app</string>
+		<key>UpdateFeedURL</key>
+		<string>https://updates.datadebris.app/appcast.xml</string>
 		<key>LicenseWorkerURL</key>
 		<string>http://127.0.0.1:8787</string>
+		<key>SupportEmail</key>
+		<string>support@datadebris.app</string>
 	</dict>
 	<key>Release</key>
 	<dict>
@@ -35,8 +39,12 @@
 		<string>https://customer-portal.paddle.com/</string>
 		<key>UpdateHost</key>
 		<string>updates.datadebris.app</string>
+		<key>UpdateFeedURL</key>
+		<string>https://updates.datadebris.app/appcast.xml</string>
 		<key>LicenseWorkerURL</key>
 		<string>https://license.datadebris.app</string>
+		<key>SupportEmail</key>
+		<string>support@datadebris.app</string>
 	</dict>
 </dict>
 </plist>

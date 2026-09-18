@@ -62,11 +62,15 @@ final class AppModel: ObservableObject {
     @Published private(set) var fdaGranted: Bool
     /// Non-nil while the "Move to Applications" sheet is up; shown before
     /// any Full Disk Access request and again on every launch until moved.
-    @Published var moveOffer: MoveOffer?
+    @Published var moveOffer: MoveOffer? { didSet { if moveOffer == nil { presentPendingSheets() } } }
     /// The freshly moved copy lost the grant: one sentence + Settings link.
-    @Published var movedNotice: MovedNotice?
+    @Published var movedNotice: MovedNotice? { didSet { if movedNotice == nil { presentPendingSheets() } } }
     struct MoveOffer: Identifiable { let destination: URL; var id: String { destination.path } }
     enum MovedNotice: String, Identifiable { case fdaLost; var id: String { rawValue } }
+    /// "What's new in the catalogue" after an update; waits behind the move
+    /// sheets so only one sheet is ever up.
+    @Published var catalogueChanges: CatalogueChanges?
+    private var pendingCatalogueChanges: CatalogueChanges?
     @Published private(set) var scanStartedAt: Date?
 
     /// Set by "Never touch selected" so the toast can undo the whole batch.
@@ -95,6 +99,7 @@ final class AppModel: ObservableObject {
 
     static let welcomeCompletedKey = "welcomeCompleted"
     static let fdaWasGrantedKey = "fdaWasGranted"
+    static let catalogueSeenKey = "catalogueSeen"
     private let fdaProbe: () -> Bool
 
     init(store: FindingsStore, history: HistoryStore, exclusions: ExclusionStore,
@@ -139,6 +144,18 @@ final class AppModel: ObservableObject {
         }
         if granted { defaults.set(true, forKey: Self.fdaWasGrantedKey) }
 
+        // An update ships a new bundled catalogue; diff it against what the
+        // user last saw. Selections are untouched: new rules stay unticked
+        // (S9) and `validated(against:)` only ever removes ids.
+        let seen = defaults.data(forKey: Self.catalogueSeenKey)
+            .flatMap { try? JSONDecoder().decode(CatalogueSeen.self, from: $0) }
+        if let changes = catalogue.changes(since: seen), !changes.isEmpty {
+            pendingCatalogueChanges = changes
+        }
+        if seen != catalogue.seen, let data = try? JSONEncoder().encode(catalogue.seen) {
+            defaults.set(data, forKey: Self.catalogueSeenKey)
+        }
+
         session.$isScanning
             .dropFirst()
             .removeDuplicates()
@@ -157,10 +174,18 @@ final class AppModel: ObservableObject {
             .store(in: &cancellables)
 
         refresh()
+        presentPendingSheets()
         applyDebugRoute()
         #if DEBUG
         applyDriveIfRequested()
         #endif
+    }
+
+    private func presentPendingSheets() {
+        guard moveOffer == nil, movedNotice == nil, !showWelcome,
+              let changes = pendingCatalogueChanges else { return }
+        pendingCatalogueChanges = nil
+        catalogueChanges = changes
     }
 
     static func live() -> AppModel {
@@ -909,6 +934,11 @@ final class AppModel: ObservableObject {
             showWelcome = false; sidebar = .home
             moveOffer = MoveOffer(destination: URL(fileURLWithPath: "/Applications/DataDebris.app"))
         case "moved-fda-lost": showWelcome = false; sidebar = .home; movedNotice = .fdaLost
+        case "whats-new":
+            showWelcome = false; sidebar = .home
+            catalogueChanges = CatalogueChanges(
+                fromVersion: catalogue.version - 1, toVersion: catalogue.version,
+                added: Array(catalogue.rules.prefix(2)), removedIds: ["logs.example.retired"])
         case "home": showWelcome = false; sidebar = .home
         case "results": showWelcome = false; sidebar = .results
         case "scanning":

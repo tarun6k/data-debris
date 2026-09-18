@@ -55,6 +55,17 @@ struct ContentView: View {
             MovedNoticeSheet()
                 .environmentObject(model)
         }
+        .sheet(isPresented: catalogueChangesBinding) {
+            if let changes = model.catalogueChanges {
+                CatalogueWhatsNewSheet(changes: changes)
+                    .environmentObject(model)
+            }
+        }
+    }
+
+    private var catalogueChangesBinding: Binding<Bool> {
+        Binding(get: { model.catalogueChanges != nil },
+                set: { if !$0 { model.catalogueChanges = nil } })
     }
 
     private var mainWindow: some View {

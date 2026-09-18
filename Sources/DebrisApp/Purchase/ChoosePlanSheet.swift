@@ -264,21 +264,15 @@ struct LicenseEntrySheet: View {
 /// a USD answer means the cards just show the USD anchors.
 enum PaddlePricing {
 
+    /// Best effort: the license worker proxies Paddle's pricing preview (the
+    /// app's two hosts stay the feed and the license service); empty on any
+    /// failure and the cards keep their USD anchors.
     static func localizedTotals(config: LicenseConfig) async -> [String: String] {
-        guard let token = config.paddleClientToken else { return [:] }
+        guard let workerURL = config.workerURL else { return [:] }
         let ids = Array(Set(config.priceIds.values)).sorted()
         guard !ids.isEmpty else { return [:] }
-        let host = config.paddleEnv == "sandbox" ? "sandbox-api.paddle.com" : "api.paddle.com"
-        var request = URLRequest(url: URL(string: "https://\(host)/pricing-preview")!,
-                                 timeoutInterval: 5)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "items": ids.map { ["price_id": $0, "quantity": 1] },
-        ])
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return [:] }
+        guard let data = try? await LicenseClient(baseURL: workerURL).pricingPreview(priceIds: ids)
+        else { return [:] }
         return parse(data) ?? [:]
     }
 

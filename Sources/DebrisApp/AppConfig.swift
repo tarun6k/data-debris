@@ -22,10 +22,13 @@ struct AppConfig: Equatable {
     var termsURL: URL
     var securityURL: URL
     var customerPortalURL: URL
-    /// The Sparkle feed host (Phase 8); named on the privacy sheet now so
-    /// the promise does not change under users later.
+    /// The Sparkle feed host; named on the privacy sheet and About.
     var updateHost: String
+    /// The appcast Sparkle fetches; must live on `updateHost`.
+    var updateFeedURL: URL
     var licenseWorkerURL: URL
+    /// Where "Report a problem" and About send people.
+    var supportEmail: String
 
     /// The second hostname the privacy sheet promises ("a license check").
     var licenseHost: String {
@@ -73,16 +76,25 @@ struct AppConfig: Equatable {
         securityURL = try url("SecurityURL")
         customerPortalURL = try url("CustomerPortalURL")
         updateHost = try string("UpdateHost")
+        updateFeedURL = try url("UpdateFeedURL")
+        guard updateFeedURL.host == updateHost, updateFeedURL.scheme == "https" else {
+            throw LoadError.badURL("UpdateFeedURL")
+        }
         licenseWorkerURL = try url("LicenseWorkerURL")
+        supportEmail = try string("SupportEmail")
+        guard supportEmail.contains("@") else { throw LoadError.badURL("SupportEmail") }
     }
 
     init(privacyPolicyURL: URL, termsURL: URL, securityURL: URL, customerPortalURL: URL,
-         updateHost: String, licenseWorkerURL: URL) {
+         updateHost: String, updateFeedURL: URL? = nil, licenseWorkerURL: URL,
+         supportEmail: String = "support@example.test") {
         self.privacyPolicyURL = privacyPolicyURL
         self.termsURL = termsURL
         self.securityURL = securityURL
         self.customerPortalURL = customerPortalURL
         self.updateHost = updateHost
+        self.updateFeedURL = updateFeedURL ?? URL(string: "https://\(updateHost)/appcast.xml")!
         self.licenseWorkerURL = licenseWorkerURL
+        self.supportEmail = supportEmail
     }
 }

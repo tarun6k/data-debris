@@ -18,6 +18,9 @@ final class AppConfigTests: XCTestCase {
             XCTAssertEqual(config.termsURL.host, "datadebris.app")
             XCTAssertEqual(config.securityURL.host, "datadebris.app")
             XCTAssertEqual(config.updateHost, "updates.datadebris.app")
+            XCTAssertEqual(config.updateFeedURL.absoluteString,
+                           "https://updates.datadebris.app/appcast.xml")
+            XCTAssertEqual(config.supportEmail, "support@datadebris.app")
         }
         // Debug talks to `wrangler dev` and the sandbox portal; Release to production.
         XCTAssertEqual(debug.licenseWorkerURL.host, "127.0.0.1")
@@ -81,6 +84,15 @@ final class AppConfigTests: XCTestCase {
             "UpdateHost": "u", "LicenseWorkerURL": "https://l.example.test",
         ])) {
             XCTAssertEqual($0 as? AppConfig.LoadError, .badURL("CustomerPortalURL"))
+        }
+        // The feed must sit on the host the privacy sheet names.
+        XCTAssertThrowsError(try AppConfig(plist: [
+            "PrivacyPolicyURL": "https://example.test/p", "TermsURL": "https://example.test/t",
+            "SecurityURL": "https://example.test/s", "CustomerPortalURL": "https://example.test/c",
+            "UpdateHost": "u.example.test", "UpdateFeedURL": "https://other.example.test/appcast.xml",
+            "LicenseWorkerURL": "https://l.example.test", "SupportEmail": "support@example.test",
+        ])) {
+            XCTAssertEqual($0 as? AppConfig.LoadError, .badURL("UpdateFeedURL"))
         }
         XCTAssertThrowsError(try AppConfig.load(variant: .release, bundle: Bundle(for: XCTestCase.self))) {
             XCTAssertEqual($0 as? AppConfig.LoadError, .missingResource)

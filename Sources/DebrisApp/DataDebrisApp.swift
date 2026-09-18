@@ -56,6 +56,7 @@ enum Snapshot {
 // @main lives on Main, which routes --auto-clean to the headless runner.
 struct DataDebrisApp: App {
     @StateObject private var model = AppModel.live()
+    @StateObject private var updates = UpdateManager.live()
     @AppStorage("showInMenuBar") private var showInMenuBar = false
 
     init() {
@@ -72,12 +73,17 @@ struct DataDebrisApp: App {
         WindowGroup("Data Debris", id: "main") {
             ContentView()
                 .environmentObject(model)
+                .environmentObject(updates)
                 .frame(minWidth: 960, minHeight: 640)
                 .onAppear { NotificationHandler.shared.model = model }
                 // datadebris://checkout-success — poll for the key right away.
                 .onOpenURL { model.handleURL($0) }
         }
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for updates…") { updates.checkForUpdates() }
+                    .disabled(!updates.canCheck)
+            }
             CommandGroup(after: .newItem) {
                 Button("Scan Now") { model.startScan() }
                     .keyboardShortcut("r")

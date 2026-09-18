@@ -74,6 +74,13 @@ public struct LicenseClient {
         _ = try await post("recover", body: ["email": email])
     }
 
+    /// Localised plan prices for the plan cards. The worker asks Paddle, so
+    /// the app never talks to a third host. Raw JSON; PaddlePricing parses.
+    public func pricingPreview(priceIds: [String]) async throws -> Data {
+        let body = ["items": priceIds.map { ["price_id": $0, "quantity": 1] as [String: Any] }]
+        return try await post("pricing-preview", data: try JSONSerialization.data(withJSONObject: body))
+    }
+
     // MARK: - Private
 
     private func entitlement(from path: String, body: [String: String]) async throws -> String {
@@ -85,10 +92,14 @@ public struct LicenseClient {
     }
 
     private func post(_ path: String, body: [String: String]) async throws -> Data {
+        try await post(path, data: try JSONEncoder().encode(body))
+    }
+
+    private func post(_ path: String, data body: Data) async throws -> Data {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(body)
+        request.httpBody = body
         let (data, response) = try await session.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else { throw Self.error(for: status) }

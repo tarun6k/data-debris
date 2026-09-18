@@ -10,6 +10,9 @@ packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift
     from: 7.0.0
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.9.6
 
 settings:
   base:
@@ -52,6 +55,8 @@ targets:
     dependencies:
       - target: DebrisCore
         embed: true
+      - package: Sparkle
+        product: Sparkle
     # INFOPLIST_KEY_* build settings cannot express the CFBundleURLTypes
     # array, so the datadebris:// checkout callback lives in a generated
     # plist that Xcode merges with those settings.
@@ -61,6 +66,14 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.tarunkumar.datadebris.checkout
             CFBundleURLSchemes: [datadebris]
+        # Sparkle. The feed URL comes from AppConfig.plist (UpdateFeedURL)
+        # through the updater delegate, so the privacy sheet, About and the
+        # updater cannot disagree. The EdDSA public key is generated in 8B
+        # (`generate_keys`); until then UpdateManager leaves the updater off.
+        SUPublicEDKey: REPLACE_WITH_ED_PUBLIC_KEY
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+        SUAllowsAutomaticUpdates: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tarunkumar.datadebris
