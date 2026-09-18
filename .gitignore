@@ -4,6 +4,7 @@ Sources/DebrisApp/Info.plist
 
 # Build output
 build/
+*.dmg
 DerivedData/
 .build/
 .swiftpm/
@@ -13,6 +14,7 @@ xcuserdata/
 *.xcuserstate
 
 # Secrets
+keys/
 .env
 .env.*
 !.env.example

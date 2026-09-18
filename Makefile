@@ -3,7 +3,7 @@ SCHEME := DataDebris
 DERIVED := build
 APP := $(DERIVED)/Build/Products/Debug/DataDebris.app
 
-.PHONY: gen build test run clean
+.PHONY: gen build test run clean release icon
 
 gen:
 	xcodegen generate
@@ -21,3 +21,11 @@ run: build
 
 clean:
 	rm -rf $(DERIVED) $(PROJECT)
+
+# Release archive + DMG (+ notarization and signed appcast when the
+# identities are exported; see scripts/release-env.sh). Output: build/release/
+release:
+	scripts/release.sh
+
+icon:
+	scripts/make-icon.sh

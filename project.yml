@@ -81,7 +81,7 @@ targets:
         # CFBundleShortVersionString / CFBundleVersion come from these two
         # (the generated plist drops the keys when they are unset). Sparkle
         # compares CFBundleVersion, so bump CURRENT_PROJECT_VERSION on every
-        # release; scripts/build-release.sh refuses to run otherwise.
+        # release; scripts/build-release.sh warns when that build is tagged.
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: 1
         GENERATE_INFOPLIST_FILE: YES
