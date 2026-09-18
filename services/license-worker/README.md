@@ -15,6 +15,7 @@ documented at the top of `src/store.ts`.
 | POST | `/validate` | `{ key, machineId }` | `{ entitlement }` | 404 `unknown_key`, 402 `inactive` (refunded) |
 | POST | `/deactivate` | `{ key, machineId }` | `{ ok }` | — (idempotent) |
 | POST | `/recover` | `{ email }` | `{ ok }` | — (always 200) |
+| POST | `/pricing-preview` | `{ items: [{ price_id }] }` | Paddle preview, trimmed to `currency_code` + per-price `formatted_totals.total` | 400 unknown price id, 502 Paddle error |
 | GET | `/healthz` | — | `{ ok }` | — |
 
 Client endpoints are rate-limited to 30/min per IP. `entitlement` is

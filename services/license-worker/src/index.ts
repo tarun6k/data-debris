@@ -43,6 +43,7 @@ export default {
         case "/validate": return validate(env, body);
         case "/deactivate": return deactivate(env, body);
         case "/recover": return recover(env, body);
+        case "/pricing-preview": return pricingPreview(env, body, req);
       }
     }
     return json({ error: "not_found" }, 404);
@@ -164,4 +165,65 @@ async function recover(env: Env, body: any): Promise<Response> {
     }
   }
   return json({ ok: true });
+}
+
+// The app shows localised plan prices on its plan cards but must only ever
+// talk to this service, so Paddle's pricing preview is proxied here. Only
+// our own price ids are accepted (this is not an open proxy) and the reply
+// is trimmed to what the cards need. Paddle localises by IP; Cloudflare's
+// view of the caller is passed on when it is a public address.
+async function pricingPreview(env: Env, body: any, req: Request): Promise<Response> {
+  const known = new Set([
+    env.PADDLE_PRICE_1Y_RECURRING, env.PADDLE_PRICE_1Y_ONETIME,
+    env.PADDLE_PRICE_3Y_RECURRING, env.PADDLE_PRICE_3Y_ONETIME,
+  ]);
+  const items: unknown[] = Array.isArray(body?.items) ? body.items : [];
+  if (items.length === 0 || items.length > known.size) return json({ error: "bad_request" }, 400);
+  const ids: string[] = [];
+  for (const item of items) {
+    const id = (item as { price_id?: unknown })?.price_id;
+    if (typeof id !== "string" || !known.has(id)) return json({ error: "bad_request" }, 400);
+    ids.push(id);
+  }
+  const payload: Record<string, unknown> = {
+    items: ids.map((price_id) => ({ price_id, quantity: 1 })),
+  };
+  const ip = req.headers.get("cf-connecting-ip");
+  if (ip && !isPrivateAddress(ip)) payload.customer_ip_address = ip;
+
+  const base = env.PADDLE_ENV === "production"
+    ? "https://api.paddle.com"
+    : "https://sandbox-api.paddle.com";
+  let upstream: any;
+  try {
+    const res = await fetch(`${base}/pricing-preview`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.PADDLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return json({ error: "upstream" }, 502);
+    upstream = await res.json();
+  } catch {
+    return json({ error: "upstream" }, 502);
+  }
+  const lineItems: any[] = upstream?.data?.details?.line_items ?? [];
+  return json({
+    data: {
+      currency_code: upstream?.data?.currency_code ?? "USD",
+      details: {
+        line_items: lineItems.map((li) => ({
+          price: { id: li?.price?.id },
+          formatted_totals: { total: li?.formatted_totals?.total },
+        })),
+      },
+    },
+  });
+}
+
+function isPrivateAddress(ip: string): boolean {
+  return ip === "local" || ip.startsWith("127.") || ip.startsWith("10.") || ip.startsWith("192.168.")
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(ip) || ip === "::1" || ip.startsWith("fc") || ip.startsWith("fd");
 }

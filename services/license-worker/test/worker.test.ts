@@ -317,3 +317,57 @@ describe("misc endpoints", () => {
     expect(last).toBe(429);
   });
 });
+
+describe("pricing preview proxy", () => {
+  it("forwards our price ids to Paddle and trims the reply", async () => {
+    let forwarded: any;
+    fetchMock
+      .get("https://sandbox-api.paddle.com")
+      .intercept({ method: "POST", path: "/pricing-preview" })
+      .reply(200, (opts) => {
+        forwarded = JSON.parse(opts.body as string);
+        return {
+          data: {
+            currency_code: "EUR",
+            customer_ip_address: "should-not-leak",
+            details: {
+              line_items: [
+                { price: { id: "price-1y-onetime", secret: "x" }, formatted_totals: { total: "€19.00", subtotal: "€16.00" } },
+              ],
+            },
+          },
+        };
+      });
+    const res = await SELF.fetch("https://license.test/pricing-preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "203.0.113.9" },
+      body: JSON.stringify({ items: [{ price_id: "price-1y-onetime", quantity: 1 }] }),
+    });
+    expect(res.status).toBe(200);
+    expect(forwarded).toEqual({
+      items: [{ price_id: "price-1y-onetime", quantity: 1 }],
+      customer_ip_address: "203.0.113.9",
+    });
+    expect(await res.json()).toEqual({
+      data: {
+        currency_code: "EUR",
+        details: { line_items: [{ price: { id: "price-1y-onetime" }, formatted_totals: { total: "€19.00" } }] },
+      },
+    });
+  });
+
+  it("rejects price ids that are not ours", async () => {
+    const res = await post("/pricing-preview", { items: [{ price_id: "pri_someone_elses" }] });
+    expect(res.status).toBe(400);
+  });
+
+  it("reports a Paddle failure as 502 without a body from upstream", async () => {
+    fetchMock
+      .get("https://sandbox-api.paddle.com")
+      .intercept({ method: "POST", path: "/pricing-preview" })
+      .reply(500, { error: "boom" });
+    const res = await post("/pricing-preview", { items: [{ price_id: "price-3y-onetime" }] });
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "upstream" });
+  });
+});
