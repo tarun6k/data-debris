@@ -37,12 +37,17 @@ enum Snapshot {
             attempts += 1
             if capture(to: path) {
                 FileHandle.standardError.write(Data("SNAPSHOT: written after \(attempts) attempts\n".utf8))
+                if args.contains("--quit") { quit() }
             } else if attempts < 20 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) { tryCapture() }
             } else {
                 FileHandle.standardError.write(Data("SNAPSHOT: gave up — no visible window\n".utf8))
+                if args.contains("--quit") { quit() }
             }
         }
+        // `--quit`: a routed run has nothing to save (scratch profile), and a
+        // presented sheet can hold up NSApp.terminate, so exit outright.
+        func quit() -> Never { exit(0) }
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { tryCapture() }
     }
 }
