@@ -1,3 +1,4 @@
+import DebrisCore
 import AppKit
 import Foundation
 
@@ -46,7 +47,7 @@ enum MoveToApplications {
             NSLog("Move to Applications failed: \(error.localizedDescription)")
             return
         }
-        UserDefaults.standard.set(source.path, forKey: pendingRemovalKey)
+        AppPaths.userDefaults.set(source.path, forKey: pendingRemovalKey)
         NSWorkspace.shared.openApplication(
             at: destination, configuration: NSWorkspace.OpenConfiguration()
         ) { _, _ in
@@ -56,8 +57,8 @@ enum MoveToApplications {
 
     /// Called at launch by the /Applications copy.
     static func removeOldCopyIfPending() {
-        guard let old = UserDefaults.standard.string(forKey: pendingRemovalKey) else { return }
-        UserDefaults.standard.removeObject(forKey: pendingRemovalKey)
+        guard let old = AppPaths.userDefaults.string(forKey: pendingRemovalKey) else { return }
+        AppPaths.userDefaults.removeObject(forKey: pendingRemovalKey)
         guard old != Bundle.main.bundleURL.path, old.hasSuffix(".app") else { return }
         try? FileManager.default.removeItem(atPath: old)
     }

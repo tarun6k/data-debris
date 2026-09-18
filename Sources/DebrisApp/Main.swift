@@ -9,6 +9,10 @@ import os
 @main
 enum Main {
     static func main() {
+        #if DEBUG
+        // Before anything can open a store: --screen/--drive get a scratch profile.
+        DebugProfile.installIfRouted()
+        #endif
         if let reason = autoCleanReason() {
             headlessRun(reason: reason)
         }

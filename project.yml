@@ -101,6 +101,10 @@ schemes:
       config: Debug
     test:
       config: Debug
+      # The hosted test app boots the real AppModel; keep it off the real
+      # profile, Keychain item and LaunchAgents (see AppPaths).
+      environmentVariables:
+        APP_SUPPORT_OVERRIDE: /tmp/DataDebris-tests
       targets:
         - DebrisCoreTests
         - DebrisAppTests

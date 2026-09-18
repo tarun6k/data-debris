@@ -1,3 +1,4 @@
+import DebrisCore
 import Foundation
 
 /// Free/total are read live (cheap). The System/Apps/Documents split needs a
@@ -33,7 +34,7 @@ enum DiskUsage {
     }
 
     static func cached() -> DiskSnapshot? {
-        guard let data = UserDefaults.standard.data(forKey: cacheKey) else { return nil }
+        guard let data = AppPaths.userDefaults.data(forKey: cacheKey) else { return nil }
         return try? JSONDecoder().decode(DiskSnapshot.self, from: data)
     }
 
@@ -62,7 +63,7 @@ enum DiskUsage {
                 computedAt: Date())
         }.value
         if let data = try? JSONEncoder().encode(snapshot) {
-            UserDefaults.standard.set(data, forKey: cacheKey)
+            AppPaths.userDefaults.set(data, forKey: cacheKey)
         }
         return snapshot
     }

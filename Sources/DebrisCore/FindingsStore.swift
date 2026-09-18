@@ -24,12 +24,10 @@ public final class FindingsStore: @unchecked Sendable { // DatabasePool is threa
 
     private let pool: DatabasePool
 
+    /// Every other on-disk file (history, settings, run lock, exclusions)
+    /// lives next to this; AppPaths decides where "next to" is.
     public static func defaultDatabaseURL() throws -> URL {
-        let dir = try FileManager.default
-            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("DataDebris", isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("findings.sqlite")
+        try AppPaths.applicationSupportDirectory().appendingPathComponent("findings.sqlite")
     }
 
     public init(databaseURL: URL? = nil) throws {

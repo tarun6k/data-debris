@@ -113,7 +113,7 @@ final class AppModel: ObservableObject {
         }
         entitlementState = entitlements.state
 
-        let defaults = UserDefaults.standard
+        let defaults = AppPaths.userDefaults
         // First launch, or FDA revoked after we once saw it granted.
         showWelcome = !defaults.bool(forKey: Self.welcomeCompletedKey)
             || (defaults.bool(forKey: Self.fdaWasGrantedKey) && !FullDiskAccess.granted)
@@ -181,7 +181,7 @@ final class AppModel: ObservableObject {
 
     /// The retention control lives in Settings (later phase); History shows it.
     static var historyRetentionDays: Int {
-        let days = UserDefaults.standard.integer(forKey: "historyRetentionDays")
+        let days = AppPaths.userDefaults.integer(forKey: "historyRetentionDays")
         return [30, 90, 365].contains(days) ? days : 90
     }
 
@@ -267,11 +267,11 @@ final class AppModel: ObservableObject {
 
     func recheckFDA() {
         fdaGranted = FullDiskAccess.granted
-        if fdaGranted { UserDefaults.standard.set(true, forKey: Self.fdaWasGrantedKey) }
+        if fdaGranted { AppPaths.userDefaults.set(true, forKey: Self.fdaWasGrantedKey) }
     }
 
     func completeWelcome() {
-        UserDefaults.standard.set(true, forKey: Self.welcomeCompletedKey)
+        AppPaths.userDefaults.set(true, forKey: Self.welcomeCompletedKey)
         recheckFDA()
         showWelcome = false
     }
@@ -464,7 +464,7 @@ final class AppModel: ObservableObject {
         // Partial (denied paths) still walked everything it could; only a
         // cancelled scan under-counts.
         if let result = session.lastResult, result.status != .cancelled {
-            UserDefaults.standard.set(result.recordCount, forKey: "lastScanRecordCount")
+            AppPaths.userDefaults.set(result.recordCount, forKey: "lastScanRecordCount")
         }
         refresh()
     }
@@ -472,7 +472,7 @@ final class AppModel: ObservableObject {
     /// 0…1 against the previous complete scan's record count; nil = first
     /// scan, show an indeterminate bar.
     var scanProgressFraction: Double? {
-        let last = UserDefaults.standard.integer(forKey: "lastScanRecordCount")
+        let last = AppPaths.userDefaults.integer(forKey: "lastScanRecordCount")
         guard last > 0 else { return nil }
         return min(0.97, Double(session.recordCount) / Double(last))
     }
@@ -883,8 +883,8 @@ final class AppModel: ObservableObject {
             showWelcome = false
             sidebar = .duplicates
         // Screenshot routes for the purchase sheets. "plan" acknowledges the
-        // privacy sheet (writes settings.json), so only use it with a scratch
-        // HOME — never on a profile whose acknowledgement state matters.
+        // privacy sheet (writes settings.json) — into the scratch profile
+        // DebugProfile installed for every --screen launch, never the real one.
         case "privacy", "plan":
             showWelcome = false
             Task {

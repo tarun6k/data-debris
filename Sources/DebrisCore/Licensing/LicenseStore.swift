@@ -15,8 +15,9 @@ public enum LicenseStoreError: Error, Equatable {
 
 /// kSecClassGenericPassword under the app's license service. Not synchronized:
 /// the 2-Mac limit is per machine, an iCloud-synced key would defeat it.
+/// The service is ".debug"-suffixed under APP_SUPPORT_OVERRIDE (see AppPaths).
 public struct KeychainSecretStore: SecretStore {
-    public static let service = "com.tarunkumar.datadebris.license"
+    public static var service: String { AppPaths.keychainService }
     private let account: String
 
     public init(account: String = "license") {

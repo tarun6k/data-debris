@@ -9,9 +9,11 @@ public enum LaunchAgentError: Error, Equatable {
 /// — plain launchctl as the current user, no daemon, no root, ever (S8).
 public struct LaunchAgentManager {
 
-    public static let label = "com.tarunkumar.datadebris.autoclean"
-    public static let lowSpaceLabel = label + ".lowspace"
-    public static let retryLabel = label + ".retry"
+    /// ".debug"-suffixed under APP_SUPPORT_OVERRIDE (see AppPaths), so a
+    /// debug run can never bootout or overwrite the real agents.
+    public static var label: String { AppPaths.launchAgentLabel }
+    public static var lowSpaceLabel: String { label + ".lowspace" }
+    public static var retryLabel: String { label + ".retry" }
 
     private let agentsDirectory: URL
     private let programPath: String?
@@ -24,8 +26,7 @@ public struct LaunchAgentManager {
         uid: uid_t = getuid(),
         launchctl: @escaping ([String]) -> Int32 = LaunchAgentManager.systemLaunchctl
     ) {
-        self.agentsDirectory = agentsDirectory ?? FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/LaunchAgents", isDirectory: true)
+        self.agentsDirectory = agentsDirectory ?? AppPaths.launchAgentsDirectory()
         self.programPath = programPath
         self.uid = uid
         self.launchctl = launchctl
@@ -69,6 +70,11 @@ public struct LaunchAgentManager {
             "ProcessType": "Background",
         ]
         plist.merge(trigger) { current, _ in current }
+        // launchd does not inherit our environment: a debug-profile agent
+        // must run its headless clean against the same scratch profile.
+        if let override = AppPaths.overrideDirectory {
+            plist["EnvironmentVariables"] = [AppPaths.overrideKey: override.path]
+        }
         return plist
     }
 
