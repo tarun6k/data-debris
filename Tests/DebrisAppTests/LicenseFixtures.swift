@@ -18,7 +18,12 @@ enum LicenseFixture {
     static let signingKey = Curve25519.Signing.PrivateKey()
     static var publicKey: Data { signingKey.publicKey.rawRepresentation }
 
+    /// "Now" for every app test: 2027-01-15 — never the wall clock.
+    static let epoch = Date(timeIntervalSince1970: 1_800_000_000)
+    static func clock() -> FixedClock { FixedClock(epoch) }
+
     static func payload(
+        now: Date = epoch,
         expiresIn: TimeInterval = 200 * 86_400,
         plan: LicensePlan = .oneYear,
         status: LicenseStatus = .active,
@@ -28,9 +33,9 @@ enum LicenseFixture {
     ) -> EntitlementPayload {
         EntitlementPayload(
             key: key, plan: plan,
-            expiresAt: Int(Date().addingTimeInterval(expiresIn).timeIntervalSince1970),
+            expiresAt: Int(now.addingTimeInterval(expiresIn).timeIntervalSince1970),
             status: status, autoRenew: autoRenew, machines: machines,
-            issuedAt: Int(Date().timeIntervalSince1970), machineId: machines[0].id)
+            issuedAt: Int(now.timeIntervalSince1970), machineId: machines[0].id)
     }
 
     static func compact(_ payload: EntitlementPayload) -> String {
@@ -44,20 +49,22 @@ enum LicenseFixture {
         return "\(b64url(body)).\(b64url(try! signingKey.signature(for: body)))"
     }
 
-    static func freeStore() -> LicenseStore {
-        LicenseStore(backing: MemorySecretStore(), publicKey: publicKey)
+    static func freeStore(clock: Clock = FixedClock(epoch)) -> LicenseStore {
+        LicenseStore(backing: MemorySecretStore(), publicKey: publicKey, clock: clock)
     }
 
-    static func activeStore(payload: EntitlementPayload? = nil) -> LicenseStore {
-        let store = freeStore()
+    static func activeStore(payload: EntitlementPayload? = nil,
+                            clock: Clock = FixedClock(epoch)) -> LicenseStore {
+        let store = freeStore(clock: clock)
         let p = payload ?? self.payload()
-        try! store.save(licenseKey: p.key, entitlement: compact(p), lastValidatedAt: Date())
+        try! store.save(licenseKey: p.key, entitlement: compact(p), lastValidatedAt: clock.now())
         return store
     }
 }
 
 /// Scriptable stand-in for the worker; every call is recorded.
 final class FakeLicenseService: LicenseService {
+    var clock: Clock = FixedClock(LicenseFixture.epoch)
     var keysByReference: [String: String] = [:]
     var activateError: LicenseClientError?
     var validatePayload: EntitlementPayload?
@@ -77,7 +84,7 @@ final class FakeLicenseService: LicenseService {
         if let error = activateError { throw error }
         return LicenseFixture.compact(LicenseFixture.payload(
             machines: [LicensedMachine(id: machineId, name: machineName,
-                                       activatedAt: Int(Date().timeIntervalSince1970))],
+                                       activatedAt: Int(clock.now().timeIntervalSince1970))],
             key: key))
     }
 

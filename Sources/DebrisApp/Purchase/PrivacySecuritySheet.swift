@@ -1,6 +1,44 @@
+import Combine
 import DebrisCore
 import Network
 import SwiftUI
+
+/// The Continue gate: the ScrollView must have reached its end (latched — a
+/// scroll back up does not re-lock) AND the box must be ticked. Fed by a
+/// publisher of scroll positions so the rule is testable without a window.
+@MainActor
+final class PrivacySheetGate: ObservableObject {
+
+    struct ScrollPosition: Equatable {
+        /// Bottom edge of the content, in the scroll view's coordinate space.
+        var contentMaxY: CGFloat
+        var viewportHeight: CGFloat
+    }
+
+    /// Sub-pixel layout and rubber-banding: "at the end" within 8 pt.
+    static let tolerance: CGFloat = 8
+
+    /// Never pre-ticked (spec).
+    @Published var ticked = false
+    @Published private(set) var scrolledToEnd = false
+    private var subscription: AnyCancellable?
+
+    init<P: Publisher>(positions: P) where P.Output == ScrollPosition, P.Failure == Never {
+        subscription = positions.sink { [weak self] in self?.scrollPositionChanged($0) }
+    }
+
+    static func reachedEnd(_ position: ScrollPosition) -> Bool {
+        position.contentMaxY <= position.viewportHeight + tolerance
+    }
+
+    func scrollPositionChanged(_ position: ScrollPosition) {
+        if Self.reachedEnd(position) { scrolledToEnd = true }
+    }
+
+    var continueEnabled: Bool {
+        PrivacySecuritySheet.continueEnabled(scrolledToEnd: scrolledToEnd, ticked: ticked)
+    }
+}
 
 /// Screen 12 — shown before any price, its copy hashed into the
 /// acknowledgement (see PrivacySheetText). Continue unlocks only when the
@@ -10,14 +48,25 @@ struct PrivacySecuritySheet: View {
 
     let text: PrivacySheetText
     /// Settings > About shows the same sheet read-only: no checkbox, just Close.
-    var readOnly = false
-    var onContinue: () -> Void = {}
-    var onNotNow: () -> Void = {}
+    let readOnly: Bool
+    let onContinue: () -> Void
+    let onNotNow: () -> Void
 
-    @State private var ticked = false
-    @State private var scrolledToEnd = false
+    private let positions: PassthroughSubject<PrivacySheetGate.ScrollPosition, Never>
+    @StateObject private var gate: PrivacySheetGate
     @State private var showingProtections = false
     @State private var legalDocument: LegalDocument?
+
+    init(text: PrivacySheetText, readOnly: Bool = false,
+         onContinue: @escaping () -> Void = {}, onNotNow: @escaping () -> Void = {}) {
+        self.text = text
+        self.readOnly = readOnly
+        self.onContinue = onContinue
+        self.onNotNow = onNotNow
+        let positions = PassthroughSubject<PrivacySheetGate.ScrollPosition, Never>()
+        self.positions = positions
+        _gate = StateObject(wrappedValue: PrivacySheetGate(positions: positions))
+    }
 
     static func continueEnabled(scrolledToEnd: Bool, ticked: Bool) -> Bool {
         scrolledToEnd && ticked
@@ -47,15 +96,16 @@ struct PrivacySecuritySheet: View {
                     }
                     .background(GeometryReader { inner in
                         Color.clear.preference(
-                            key: ReachedEndKey.self,
-                            value: inner.frame(in: .named("privacyScroll")).maxY
-                                <= outer.size.height + 8)
+                            key: ScrollPositionKey.self,
+                            value: PrivacySheetGate.ScrollPosition(
+                                contentMaxY: inner.frame(in: .named("privacyScroll")).maxY,
+                                viewportHeight: outer.size.height))
                     })
                 }
                 .coordinateSpace(name: "privacyScroll")
             }
-            .onPreferenceChange(ReachedEndKey.self) { reached in
-                if reached { scrolledToEnd = true } // latches; scrolling back up is fine
+            .onPreferenceChange(ScrollPositionKey.self) { position in
+                if let position { gate.scrollPositionChanged(position) }
             }
 
             Divider()
@@ -124,7 +174,7 @@ struct PrivacySecuritySheet: View {
     private var footer: some View {
         HStack(spacing: 12) {
             if !readOnly {
-                Toggle(text.checkboxLabel, isOn: $ticked)
+                Toggle(text.checkboxLabel, isOn: $gate.ticked)
                     .toggleStyle(.checkbox)
                     .font(.system(size: 13))
             }
@@ -139,7 +189,7 @@ struct PrivacySecuritySheet: View {
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.teal)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!Self.continueEnabled(scrolledToEnd: scrolledToEnd, ticked: ticked))
+                    .disabled(!gate.continueEnabled)
             }
         }
         .padding(.horizontal, 24)
@@ -157,10 +207,11 @@ struct PrivacySecuritySheet: View {
     }
 }
 
-private struct ReachedEndKey: PreferenceKey {
-    static var defaultValue = false
-    static func reduce(value: inout Bool, nextValue: () -> Bool) {
-        value = value || nextValue()
+private struct ScrollPositionKey: PreferenceKey {
+    static var defaultValue: PrivacySheetGate.ScrollPosition?
+    static func reduce(value: inout PrivacySheetGate.ScrollPosition?,
+                       nextValue: () -> PrivacySheetGate.ScrollPosition?) {
+        value = nextValue() ?? value
     }
 }
 

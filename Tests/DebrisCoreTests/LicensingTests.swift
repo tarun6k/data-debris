@@ -15,12 +15,14 @@ final class LicensingTests: XCTestCase {
     }
 
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private var clock: FixedClock!
     private let signingKey = Curve25519.Signing.PrivateKey()
     private var publicKey: Data { signingKey.publicKey.rawRepresentation }
     private var backing: FakeSecretStore!
 
     override func setUp() {
         backing = FakeSecretStore()
+        clock = FixedClock(now)
     }
 
     // MARK: - Helpers
@@ -53,7 +55,7 @@ final class LicensingTests: XCTestCase {
     }
 
     private func store() -> LicenseStore {
-        LicenseStore(backing: backing, publicKey: publicKey)
+        LicenseStore(backing: backing, publicKey: publicKey, clock: clock)
     }
 
     private func entitlements(_ p: EntitlementPayload?, validatedAgo: TimeInterval = 0) throws -> Entitlements {
@@ -62,8 +64,7 @@ final class LicensingTests: XCTestCase {
             try s.save(licenseKey: p.key, entitlement: try compact(p),
                        lastValidatedAt: now.addingTimeInterval(-validatedAgo))
         }
-        let fixedNow = now
-        return Entitlements(store: s, now: { fixedNow })
+        return Entitlements(store: s, clock: clock)
     }
 
     private func derive(_ p: EntitlementPayload?, validatedAgo: TimeInterval = 0) -> EntitlementState {
@@ -161,7 +162,7 @@ final class LicensingTests: XCTestCase {
         let stored = LicenseStore.Stored(licenseKey: p.key, entitlement: bad, lastValidatedAt: now)
         backing.blob = try JSONEncoder().encode(stored)
         XCTAssertNil(store().load())
-        XCTAssertEqual(Entitlements(store: store(), now: { self.now }).state, .free)
+        XCTAssertEqual(Entitlements(store: store(), clock: clock).state, .free)
     }
 
     /// The worker's JSON shape: machines as {id, name, activatedAt}.
@@ -201,7 +202,7 @@ final class LicensingTests: XCTestCase {
         let s = store()
         try s.save(licenseKey: "DD-TESTKEY", entitlement: legacy, lastValidatedAt: now)
         XCTAssertEqual(try XCTUnwrap(s.load()).payload.machines.map(\.id), ["m1", "m2"])
-        XCTAssertTrue(Entitlements(store: s, now: { self.now }).state.isEntitled)
+        XCTAssertTrue(Entitlements(store: s, clock: clock).state.isEntitled)
     }
 
     func testSignatureFromAnotherKeyIsRejected() throws {
@@ -251,6 +252,28 @@ final class LicensingTests: XCTestCase {
         XCTAssertEqual(loaded.payload, renewed)
         XCTAssertEqual(loaded.stored.lastValidatedAt, now)
         XCTAssertTrue(e.state.isEntitled)
+    }
+
+    /// The state machine follows the injected clock: the same cached
+    /// entitlement is active, then expiring, then lapsed as time is advanced,
+    /// and a save without a stamp uses the clock too.
+    func testStateFollowsTheClock() throws {
+        let s = store()
+        try s.save(licenseKey: "DD-TESTKEY", entitlement: try compact(payload(expiresIn: 40 * 86_400)))
+        XCTAssertEqual(try XCTUnwrap(s.load()).stored.lastValidatedAt, now, "stamped by the clock")
+        let e = Entitlements(store: s, clock: clock)
+        XCTAssertEqual(e.state, .active(plan: .oneYear,
+                                        expiresAt: now.addingTimeInterval(40 * 86_400),
+                                        autoRenew: false,
+                                        machines: payload(expiresIn: 0).machines))
+
+        clock.advance(by: 20 * 86_400)
+        if case .offlineGrace = e.state {} else { XCTFail("20 days without validation: grace, got \(e.state)") }
+        XCTAssertTrue(e.state.isEntitled)
+
+        clock.advance(by: 21 * 86_400) // day 41: past expiry
+        if case .lapsed = e.state {} else { XCTFail("expected lapsed, got \(e.state)") }
+        XCTAssertFalse(e.state.isEntitled)
     }
 
     func testValidateInactiveAnswerClearsToFree() async throws {

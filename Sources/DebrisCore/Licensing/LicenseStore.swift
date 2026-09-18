@@ -69,11 +69,14 @@ public struct LicenseStore {
     /// Exposed so the purchase flow can verify server answers (the machines
     /// list on an activation-limit) against the same key this store trusts.
     public let publicKey: Data
+    private let clock: Clock
 
     public init(backing: SecretStore = KeychainSecretStore(),
-                publicKey: Data = LicensePublicKey.production) {
+                publicKey: Data = LicensePublicKey.production,
+                clock: Clock = SystemClock()) {
         self.backing = backing
         self.publicKey = publicKey
+        self.clock = clock
     }
 
     public func load() -> (payload: EntitlementPayload, stored: Stored)? {
@@ -82,6 +85,11 @@ public struct LicenseStore {
               let payload = SignedEntitlement.verify(stored.entitlement, publicKey: publicKey)
         else { return nil }
         return (payload, stored)
+    }
+
+    /// A fresh answer from the service: validated as of now (by the clock).
+    public func save(licenseKey: String, entitlement: String) throws {
+        try save(licenseKey: licenseKey, entitlement: entitlement, lastValidatedAt: clock.now())
     }
 
     /// Refuses an entitlement that does not verify — a server bug surfaces

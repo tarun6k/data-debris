@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 @testable import DataDebris
 
@@ -31,6 +32,50 @@ final class PrivacySheetTests: XCTestCase {
         XCTAssertFalse(PrivacySecuritySheet.continueEnabled(scrolledToEnd: true, ticked: false))
         XCTAssertFalse(PrivacySecuritySheet.continueEnabled(scrolledToEnd: false, ticked: true))
         XCTAssertTrue(PrivacySecuritySheet.continueEnabled(scrolledToEnd: true, ticked: true))
+    }
+
+    /// The gate the sheet actually binds to, driven by a fake scroll-position
+    /// publisher: Continue stays off until the content's bottom edge is inside
+    /// the viewport AND the box is ticked; reaching the end latches.
+    @MainActor
+    func testContinueGateFollowsScrollPositionAndTick() {
+        let positions = PassthroughSubject<PrivacySheetGate.ScrollPosition, Never>()
+        let gate = PrivacySheetGate(positions: positions)
+        XCTAssertFalse(gate.ticked, "never pre-ticked")
+        XCTAssertFalse(gate.continueEnabled)
+
+        // Tall content, scrolled to the top: the bottom edge is far below the viewport.
+        positions.send(.init(contentMaxY: 1_400, viewportHeight: 420))
+        XCTAssertFalse(gate.scrolledToEnd)
+        gate.ticked = true
+        XCTAssertFalse(gate.continueEnabled, "ticked but not scrolled to the end")
+
+        positions.send(.init(contentMaxY: 700, viewportHeight: 420)) // halfway
+        XCTAssertFalse(gate.continueEnabled)
+        positions.send(.init(contentMaxY: 426, viewportHeight: 420)) // within 8 pt tolerance
+        XCTAssertTrue(gate.scrolledToEnd)
+        XCTAssertTrue(gate.continueEnabled)
+
+        positions.send(.init(contentMaxY: 1_400, viewportHeight: 420)) // scrolled back up
+        XCTAssertTrue(gate.scrolledToEnd, "reaching the end latches")
+        XCTAssertTrue(gate.continueEnabled)
+
+        gate.ticked = false
+        XCTAssertFalse(gate.continueEnabled, "unticking re-locks")
+
+        // The other order: end first, then tick.
+        let positions2 = PassthroughSubject<PrivacySheetGate.ScrollPosition, Never>()
+        let gate2 = PrivacySheetGate(positions: positions2)
+        positions2.send(.init(contentMaxY: 400, viewportHeight: 420))
+        XCTAssertTrue(gate2.scrolledToEnd)
+        XCTAssertFalse(gate2.continueEnabled, "scrolled but not ticked")
+        gate2.ticked = true
+        XCTAssertTrue(gate2.continueEnabled)
+        // Just outside the tolerance is not the end.
+        let positions3 = PassthroughSubject<PrivacySheetGate.ScrollPosition, Never>()
+        let gate3 = PrivacySheetGate(positions: positions3)
+        positions3.send(.init(contentMaxY: 429, viewportHeight: 420))
+        XCTAssertFalse(gate3.scrolledToEnd)
     }
 
     /// The hash covers the copy only: moving the worker or the update feed

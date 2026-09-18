@@ -25,7 +25,8 @@ final class PurchaseFlowTests: XCTestCase {
     private func makeModel(
         licenseStore: LicenseStore? = nil,
         service: FakeLicenseService = FakeLicenseService(),
-        privacyText: PrivacySheetText = PrivacySheetText(updateHost: "u.example", licenseHost: "l.example")
+        privacyText: PrivacySheetText = PrivacySheetText(updateHost: "u.example", licenseHost: "l.example"),
+        clock: Clock = LicenseFixture.clock()
     ) throws -> AppModel {
         AppModel(
             store: try FindingsStore(databaseURL: dir.appendingPathComponent("findings.sqlite")),
@@ -37,9 +38,10 @@ final class PurchaseFlowTests: XCTestCase {
                 agentsDirectory: dir.appendingPathComponent("LaunchAgents"),
                 programPath: "/Applications/DataDebris.app/Contents/MacOS/DataDebris",
                 uid: 501, launchctl: { _ in 0 }),
-            licenseStore: licenseStore ?? LicenseFixture.freeStore(),
+            licenseStore: licenseStore ?? LicenseFixture.freeStore(clock: clock),
             licenseService: service,
-            privacyText: privacyText)
+            privacyText: privacyText,
+            clock: clock)
     }
 
     /// A flow on its own, with every seam injected and a fast poll.
@@ -50,6 +52,7 @@ final class PurchaseFlowTests: XCTestCase {
         service: FakeLicenseService = FakeLicenseService(),
         store: LicenseStore = LicenseFixture.freeStore(),
         pollInterval: TimeInterval = 0.01,
+        clock: Clock = LicenseFixture.clock(),
         launchCheckout: @escaping (LicensePlan, Bool, String) -> Void = { _, _, _ in },
         recordAcknowledgement: @escaping () -> Void = {},
         onDone: @escaping (PurchaseFlow, PurchaseFlow.Outcome) -> Void = { _, _ in }
@@ -57,6 +60,7 @@ final class PurchaseFlowTests: XCTestCase {
         PurchaseFlow(
             resume: resume, acknowledged: acknowledged, service: service, store: store,
             machineId: "this-machine", machineName: "Test Mac", pollInterval: pollInterval,
+            clock: clock,
             launchCheckout: launchCheckout, recordAcknowledgement: recordAcknowledgement,
             onDone: onDone)
     }
@@ -210,6 +214,48 @@ final class PurchaseFlowTests: XCTestCase {
         XCTAssertEqual(payload.key, "DD-AAAAA-BBBBB-CCCCC-DDDDD")
         XCTAssertEqual(service.activateCalls.first?.machineId, "this-machine")
         XCTAssertEqual(store.load()?.stored.licenseKey, "DD-AAAAA-BBBBB-CCCCC-DDDDD")
+    }
+
+    /// The poll gives up 15 minutes after checkout opened — by the injected
+    /// clock, not wall time — and points at "Already have a license?".
+    @MainActor
+    func testPollingGivesUpAfterFifteenMinutesByTheClock() async throws {
+        let clock = LicenseFixture.clock()
+        let service = FakeLicenseService()
+        let flow = makeFlow(service: service, clock: clock)
+        flow.acknowledgePrivacy()
+        flow.choosePlan(.oneYear)
+
+        clock.advance(by: 14 * 60)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertGreaterThan(service.byReferenceCalls, 0)
+        if case .waiting = flow.step {} else { XCTFail("still waiting at 14 min: \(flow.step)") }
+
+        clock.advance(by: 2 * 60)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        guard case .failed(let message, let retryKey) = flow.step else {
+            return XCTFail("expected the timeout, got \(flow.step)")
+        }
+        XCTAssertTrue(message.hasPrefix("No completed checkout arrived"))
+        XCTAssertTrue(message.contains("Already have a license?"))
+        XCTAssertNil(retryKey)
+        let calls = service.byReferenceCalls
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(service.byReferenceCalls, calls, "polling stopped at the deadline")
+    }
+
+    /// Activation stamps lastValidatedAt from the clock, so the 24 h
+    /// re-validation and the 30-day grace count from a known instant.
+    @MainActor
+    func testActivationStampsLastValidatedAtFromTheClock() async throws {
+        let clock = FixedClock(LicenseFixture.epoch.addingTimeInterval(3_600))
+        let store = LicenseFixture.freeStore(clock: clock)
+        let flow = makeFlow(store: store, clock: clock)
+
+        await flow.enterKey("DD-AAAAA-BBBBB-CCCCC-DDDDD")
+
+        XCTAssertEqual(store.load()?.stored.lastValidatedAt, clock.current)
+        XCTAssertNotEqual(store.load()?.stored.lastValidatedAt, LicenseFixture.epoch)
     }
 
     // MARK: - Activation outcomes

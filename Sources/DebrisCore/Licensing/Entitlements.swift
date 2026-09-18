@@ -7,17 +7,17 @@ import Foundation
 public final class Entitlements {
 
     private let store: LicenseStore
-    private let now: () -> Date
+    private let clock: Clock
 
-    public init(store: LicenseStore = LicenseStore(), now: @escaping () -> Date = Date.init) {
+    public init(store: LicenseStore = LicenseStore(), clock: Clock = SystemClock()) {
         self.store = store
-        self.now = now
+        self.clock = clock
     }
 
     public var state: EntitlementState {
         guard let (payload, stored) = store.load() else { return .free }
         return EntitlementState.derive(payload: payload,
-                                       lastValidatedAt: stored.lastValidatedAt, now: now())
+                                       lastValidatedAt: stored.lastValidatedAt, now: clock.now())
     }
 
     public func require(_ feature: LockedFeature) -> GateResult {
@@ -33,12 +33,12 @@ public final class Entitlements {
         using validate: (_ key: String, _ machineId: String) async throws -> String
     ) async {
         guard let (_, stored) = store.load(),
-              now().timeIntervalSince(stored.lastValidatedAt) > EntitlementState.validateInterval
+              clock.now().timeIntervalSince(stored.lastValidatedAt) > EntitlementState.validateInterval
         else { return }
         do {
             let entitlement = try await validate(stored.licenseKey, machineId)
             try store.save(licenseKey: stored.licenseKey, entitlement: entitlement,
-                           lastValidatedAt: now())
+                           lastValidatedAt: clock.now())
         } catch LicenseClientError.inactive, LicenseClientError.unknownKey {
             store.clear()
         } catch {

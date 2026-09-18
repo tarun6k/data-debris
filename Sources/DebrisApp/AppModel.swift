@@ -32,6 +32,9 @@ final class AppModel: ObservableObject {
     let entitlements: Entitlements
     let licenseService: LicenseService?
     let privacyText: PrivacySheetText
+    /// Every licensing timestamp (validation stamps, poll deadlines, the
+    /// privacy acknowledgement) comes from here, so tests can move time.
+    let clock: Clock
 
     @Published var sidebar: SidebarItem? = .home
     @Published var openCategory: Category?
@@ -91,15 +94,17 @@ final class AppModel: ObservableObject {
          launchAgents: LaunchAgentManager? = nil,
          licenseStore: LicenseStore? = nil,
          licenseService: LicenseService? = nil,
-         privacyText: PrivacySheetText? = nil) {
+         privacyText: PrivacySheetText? = nil,
+         clock: Clock = SystemClock()) {
         self.store = store
+        self.clock = clock
         self.history = history
         self.exclusions = exclusions
         self.catalogue = catalogue
         self.autoCleanConfigURL = autoCleanConfigURL ?? (try? AutoCleanConfig.defaultFileURL())
         self.launchAgents = launchAgents ?? LaunchAgentManager()
-        self.licenseStore = licenseStore ?? LicenseStore()
-        self.entitlements = Entitlements(store: self.licenseStore)
+        self.licenseStore = licenseStore ?? LicenseStore(clock: clock)
+        self.entitlements = Entitlements(store: self.licenseStore, clock: clock)
         self.licenseService = licenseService
             ?? LicenseConfig.current.workerURL.map { LicenseClient(baseURL: $0) }
         self.privacyText = privacyText ?? PrivacySheetText()
@@ -687,6 +692,7 @@ final class AppModel: ObservableObject {
             acknowledged: privacyAcknowledged,
             service: service,
             store: licenseStore,
+            clock: clock,
             launchCheckout: { [weak self] plan, autoRenew, reference in
                 self?.openCheckout(plan: plan, autoRenew: autoRenew, reference: reference)
             },
@@ -743,7 +749,7 @@ final class AppModel: ObservableObject {
             let entitlement = try await service.activate(
                 key: key, machineId: MachineIdentity.machineId(),
                 machineName: MachineIdentity.machineName())
-            try licenseStore.save(licenseKey: key, entitlement: entitlement, lastValidatedAt: Date())
+            try licenseStore.save(licenseKey: key, entitlement: entitlement)
             refreshEntitlement()
             entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)
             if let (payload, _) = licenseStore.load() {
@@ -790,7 +796,7 @@ final class AppModel: ObservableObject {
     private func recordPrivacyAcknowledgement() {
         var config = autoCleanConfig
         config.privacyAcknowledgement = PrivacyAcknowledgement(
-            textHash: privacyText.textHash, acknowledgedAt: Date())
+            textHash: privacyText.textHash, acknowledgedAt: clock.now())
         autoCleanConfig = config
         if let url = autoCleanConfigURL { try? config.save(to: url) }
     }

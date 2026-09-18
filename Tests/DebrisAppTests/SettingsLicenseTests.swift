@@ -21,7 +21,8 @@ final class SettingsLicenseTests: XCTestCase {
     @MainActor
     private func makeModel(
         licenseStore: LicenseStore? = nil,
-        service: FakeLicenseService = FakeLicenseService()
+        service: FakeLicenseService = FakeLicenseService(),
+        clock: Clock = LicenseFixture.clock()
     ) throws -> AppModel {
         AppModel(
             store: try FindingsStore(databaseURL: dir.appendingPathComponent("findings.sqlite")),
@@ -33,9 +34,10 @@ final class SettingsLicenseTests: XCTestCase {
                 agentsDirectory: dir.appendingPathComponent("LaunchAgents"),
                 programPath: "/Applications/DataDebris.app/Contents/MacOS/DataDebris",
                 uid: 501, launchctl: { _ in 0 }),
-            licenseStore: licenseStore ?? LicenseFixture.freeStore(),
+            licenseStore: licenseStore ?? LicenseFixture.freeStore(clock: clock),
             licenseService: service,
-            privacyText: PrivacySheetText(updateHost: "u.example", licenseHost: "l.example"))
+            privacyText: PrivacySheetText(updateHost: "u.example", licenseHost: "l.example"),
+            clock: clock)
     }
 
     @MainActor

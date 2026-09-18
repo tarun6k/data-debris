@@ -58,6 +58,9 @@ final class PurchaseFlow: ObservableObject, Identifiable {
     private let machineId: String
     private let machineName: String
     private let pollInterval: TimeInterval
+    private let clock: Clock
+    /// How long the flow keeps asking the worker for the key after checkout opened.
+    static let pollTimeout: TimeInterval = 15 * 60
     private let launchCheckout: (LicensePlan, Bool, String) -> Void
     private let recordAcknowledgement: () -> Void
     private let onDone: (PurchaseFlow, Outcome) -> Void
@@ -73,6 +76,7 @@ final class PurchaseFlow: ObservableObject, Identifiable {
          machineId: String = MachineIdentity.machineId(),
          machineName: String = MachineIdentity.machineName(),
          pollInterval: TimeInterval = 3,
+         clock: Clock = SystemClock(),
          launchCheckout: @escaping (LicensePlan, Bool, String) -> Void,
          recordAcknowledgement: @escaping () -> Void,
          onDone: @escaping (PurchaseFlow, Outcome) -> Void) {
@@ -82,6 +86,7 @@ final class PurchaseFlow: ObservableObject, Identifiable {
         self.machineId = machineId
         self.machineName = machineName
         self.pollInterval = pollInterval
+        self.clock = clock
         self.launchCheckout = launchCheckout
         self.recordAcknowledgement = recordAcknowledgement
         self.onDone = onDone
@@ -139,10 +144,11 @@ final class PurchaseFlow: ObservableObject, Identifiable {
 
     private func startPolling(reference: String, immediateFirstCheck: Bool) {
         pollTask?.cancel()
+        let clock = clock
+        let deadline = clock.now().addingTimeInterval(Self.pollTimeout)
         pollTask = Task { [weak self] in
-            let deadline = Date().addingTimeInterval(15 * 60)
             var skipSleep = immediateFirstCheck
-            while let self, !Task.isCancelled, Date() < deadline {
+            while let self, !Task.isCancelled, clock.now() < deadline {
                 if !skipSleep {
                     try? await Task.sleep(nanoseconds: UInt64(self.pollInterval * 1_000_000_000))
                 }
@@ -166,7 +172,7 @@ final class PurchaseFlow: ObservableObject, Identifiable {
         do {
             let entitlement = try await service.activate(
                 key: key, machineId: machineId, machineName: machineName)
-            try store.save(licenseKey: key, entitlement: entitlement, lastValidatedAt: Date())
+            try store.save(licenseKey: key, entitlement: entitlement)
             guard let (payload, _) = store.load() else { throw LicenseStoreError.badEntitlement }
             finish(.activated(payload))
         } catch LicenseClientError.activationLimit {
