@@ -20,8 +20,8 @@ struct PrivacySheetText: Equatable {
     let linksRow = "Privacy Policy · Terms · Security page — also available offline under About"
     let checkboxLabel = "I've read how this app handles my data"
 
-    init(updateHost: String = LicenseConfig.updateHost,
-         licenseHost: String = LicenseConfig.current.licenseHost) {
+    init(updateHost: String = AppConfig.current.updateHost,
+         licenseHost: String = AppConfig.current.licenseHost) {
         sections = [
             Section(
                 number: 1, title: "What we can see",

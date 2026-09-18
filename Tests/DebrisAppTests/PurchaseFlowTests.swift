@@ -151,8 +151,7 @@ final class PurchaseFlowTests: XCTestCase {
             priceIds: [
                 "PADDLE_PRICE_1Y_RECURRING": "pri-1r", "PADDLE_PRICE_1Y_ONETIME": "pri-1o",
                 "PADDLE_PRICE_3Y_RECURRING": "pri-3r", "PADDLE_PRICE_3Y_ONETIME": "pri-3o",
-            ],
-            portalURL: URL(string: "https://example.com")!)
+            ])
         XCTAssertEqual(config.priceId(plan: .oneYear, autoRenew: false), "pri-1o")
         XCTAssertEqual(config.priceId(plan: .oneYear, autoRenew: true), "pri-1r")
         XCTAssertEqual(config.priceId(plan: .threeYears, autoRenew: false), "pri-3o")

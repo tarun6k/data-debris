@@ -1,10 +1,11 @@
 import DebrisCore
 import Foundation
 
-/// Where the purchase flow finds the license worker, the Paddle client token
-/// and the four price ids. Debug builds read the gitignored repo .env (values
-/// stay in-process, never logged); release builds read Info.plist keys of the
-/// same names, injected at archive time (Phase 8).
+/// The Paddle client token and the four price ids, plus the worker URL the
+/// client talks to. Debug builds read the gitignored repo .env (values stay
+/// in-process, never logged); release builds read Info.plist keys of the same
+/// names, injected at archive time (Phase 8). URLs and hostnames live in
+/// AppConfig; only LICENSE_WORKER_URL may override it, in Debug.
 struct LicenseConfig {
 
     var workerURL: URL?
@@ -13,13 +14,6 @@ struct LicenseConfig {
     var paddleEnv: String
     /// Keyed "PADDLE_PRICE_{1Y|3Y}_{RECURRING|ONETIME}", same names as .env.
     var priceIds: [String: String]
-    var portalURL: URL
-
-    /// The two hostnames the Privacy & Security sheet promises are the only
-    /// network calls. Sparkle arrives in Phase 8; the feed host is fixed now
-    /// so the promise (and its text hash) does not change under users later.
-    static let updateHost = "updates.datadebris.app"
-    var licenseHost: String { workerURL?.host ?? "not configured" }
 
     func priceId(plan: LicensePlan, autoRenew: Bool) -> String? {
         let key = "PADDLE_PRICE_\(plan == .oneYear ? "1Y" : "3Y")_\(autoRenew ? "RECURRING" : "ONETIME")"
@@ -30,7 +24,7 @@ struct LicenseConfig {
 
     static let current = load()
 
-    static func load() -> LicenseConfig {
+    static func load(appConfig: AppConfig = .current) -> LicenseConfig {
         var values: [String: String] = [:]
         #if DEBUG
         // …/Sources/DebrisApp/Purchase/LicenseConfig.swift → repo root.
@@ -58,15 +52,16 @@ struct LicenseConfig {
                 prices[key] = value(key)
             }
         }
-        let portal = value("PADDLE_PORTAL_URL").flatMap(URL.init(string:))
-            ?? URL(string: env == "sandbox"
-                ? "https://sandbox-customer-portal.paddle.com/"
-                : "https://customer-portal.paddle.com/")!
+        var workerURL = appConfig.licenseWorkerURL
+        #if DEBUG
+        if let override = values["LICENSE_WORKER_URL"].flatMap(URL.init(string:)) {
+            workerURL = override
+        }
+        #endif
         return LicenseConfig(
-            workerURL: value("LICENSE_WORKER_URL").flatMap(URL.init(string:)),
+            workerURL: workerURL,
             paddleClientToken: value("PADDLE_CLIENT_TOKEN"),
             paddleEnv: env,
-            priceIds: prices,
-            portalURL: portal)
+            priceIds: prices)
     }
 }

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Every URL and hostname the app shows or calls, per build configuration.
+  Nothing here is secret (Paddle tokens and price ids stay in .env / Info.plist).
+  Debug builds may override LicenseWorkerURL with LICENSE_WORKER_URL in the
+  repo .env, e.g. to point at a deployed sandbox worker.
+-->
+<dict>
+	<key>Debug</key>
+	<dict>
+		<key>PrivacyPolicyURL</key>
+		<string>https://datadebris.app/privacy</string>
+		<key>TermsURL</key>
+		<string>https://datadebris.app/terms</string>
+		<key>SecurityURL</key>
+		<string>https://datadebris.app/security</string>
+		<key>CustomerPortalURL</key>
+		<string>https://sandbox-customer-portal.paddle.com/</string>
+		<key>UpdateHost</key>
+		<string>updates.datadebris.app</string>
+		<key>LicenseWorkerURL</key>
+		<string>http://127.0.0.1:8787</string>
+	</dict>
+	<key>Release</key>
+	<dict>
+		<key>PrivacyPolicyURL</key>
+		<string>https://datadebris.app/privacy</string>
+		<key>TermsURL</key>
+		<string>https://datadebris.app/terms</string>
+		<key>SecurityURL</key>
+		<string>https://datadebris.app/security</string>
+		<key>CustomerPortalURL</key>
+		<string>https://customer-portal.paddle.com/</string>
+		<key>UpdateHost</key>
+		<string>updates.datadebris.app</string>
+		<key>LicenseWorkerURL</key>
+		<string>https://license.datadebris.app</string>
+	</dict>
+</dict>
+</plist>

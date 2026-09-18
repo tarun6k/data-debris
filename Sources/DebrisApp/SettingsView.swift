@@ -61,8 +61,8 @@ struct SettingsView: View {
                 machines(payload)
                 HStack(spacing: 10) {
                     Button("Deactivate this Mac") { confirmingDeactivate = true }
-                    Button("Manage subscription") { open(LicenseConfig.current.portalURL) }
-                    Button("Request refund") { open(LicenseConfig.current.portalURL) }
+                    Button("Manage subscription") { open(AppConfig.current.customerPortalURL) }
+                    Button("Request refund") { open(AppConfig.current.customerPortalURL) }
                 }
                 HStack(spacing: 10) {
                     Button("Enter a different key") { showingLicenseEntry = true }

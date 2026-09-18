@@ -214,9 +214,14 @@ enum LegalDocument: String, CaseIterable, Identifiable {
         }
     }
 
-    var webURL: URL {
-        let slug = self == .privacyPolicy ? "privacy" : rawValue
-        return URL(string: "https://datadebris.app/\(slug)")!
+    var webURL: URL { webURL(in: .current) }
+
+    func webURL(in config: AppConfig) -> URL {
+        switch self {
+        case .privacyPolicy: return config.privacyPolicyURL
+        case .terms: return config.termsURL
+        case .security: return config.securityURL
+        }
     }
 
     var bundledText: String {
