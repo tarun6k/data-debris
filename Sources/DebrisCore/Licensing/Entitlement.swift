@@ -17,6 +17,32 @@ public enum LicenseStatus: String, Codable, Sendable {
     case pastDue = "past_due"
 }
 
+/// One activated Mac as the worker reports it. `name` is what the app sent
+/// to /activate (Host.localizedName); a checkout pre-activation has none
+/// until the app activates. `activatedAt` is nil only for entitlements issued
+/// before names existed.
+public struct LicensedMachine: Codable, Equatable, Sendable, Identifiable {
+    public var id: String
+    public var name: String
+    public var activatedAt: Int?
+
+    public init(id: String, name: String = "", activatedAt: Int? = nil) {
+        self.id = id
+        self.name = name
+        self.activatedAt = activatedAt
+    }
+
+    public var activatedDate: Date? {
+        activatedAt.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+    }
+
+    /// Settings and the activation-limit sheet show this; an unnamed slot is
+    /// identified by the tail of its id so two of them stay distinguishable.
+    public var displayName: String {
+        name.isEmpty ? "Mac \u{2026}\(id.suffix(4))" : name
+    }
+}
+
 /// What the worker signs. Dates are Unix epoch seconds — no ISO parsing on
 /// either side.
 public struct EntitlementPayload: Codable, Equatable, Sendable {
@@ -25,12 +51,12 @@ public struct EntitlementPayload: Codable, Equatable, Sendable {
     public var expiresAt: Int
     public var status: LicenseStatus
     public var autoRenew: Bool
-    public var machines: [String]
+    public var machines: [LicensedMachine]
     public var issuedAt: Int
     public var machineId: String
 
     public init(key: String, plan: LicensePlan, expiresAt: Int, status: LicenseStatus,
-                autoRenew: Bool, machines: [String], issuedAt: Int, machineId: String) {
+                autoRenew: Bool, machines: [LicensedMachine], issuedAt: Int, machineId: String) {
         self.key = key
         self.plan = plan
         self.expiresAt = expiresAt
@@ -39,6 +65,28 @@ public struct EntitlementPayload: Codable, Equatable, Sendable {
         self.machines = machines
         self.issuedAt = issuedAt
         self.machineId = machineId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case key, plan, expiresAt, status, autoRenew, machines, issuedAt, machineId
+    }
+
+    /// Entitlements signed before machine names existed carry `machines` as
+    /// plain ids; they still verify, so they must still decode.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = try c.decode(String.self, forKey: .key)
+        plan = try c.decode(LicensePlan.self, forKey: .plan)
+        expiresAt = try c.decode(Int.self, forKey: .expiresAt)
+        status = try c.decode(LicenseStatus.self, forKey: .status)
+        autoRenew = try c.decode(Bool.self, forKey: .autoRenew)
+        issuedAt = try c.decode(Int.self, forKey: .issuedAt)
+        machineId = try c.decode(String.self, forKey: .machineId)
+        if let named = try? c.decode([LicensedMachine].self, forKey: .machines) {
+            machines = named
+        } else {
+            machines = try c.decode([String].self, forKey: .machines).map { LicensedMachine(id: $0) }
+        }
     }
 
     public var expiryDate: Date { Date(timeIntervalSince1970: TimeInterval(expiresAt)) }
@@ -72,7 +120,7 @@ public enum SignedEntitlement {
 
 public enum EntitlementState: Equatable, Sendable {
     case free
-    case active(plan: LicensePlan, expiresAt: Date, autoRenew: Bool, machines: [String])
+    case active(plan: LicensePlan, expiresAt: Date, autoRenew: Bool, machines: [LicensedMachine])
     case expiring(daysLeft: Int)
     case lapsed(since: Date)
     case offlineGrace(until: Date)

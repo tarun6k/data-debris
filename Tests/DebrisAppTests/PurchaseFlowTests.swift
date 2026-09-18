@@ -209,14 +209,17 @@ final class PurchaseFlowTests: XCTestCase {
     func testActivationLimitOffersManageMacsThenRetries() async {
         let service = FakeLicenseService()
         service.activateError = .activationLimit
-        service.validatePayload = LicenseFixture.payload(machines: ["mac-a", "mac-b"])
+        let macs = [LicensedMachine(id: "mac-a", name: "Studio", activatedAt: 1_800_000_000),
+                    LicensedMachine(id: "mac-b", name: "Laptop", activatedAt: 1_800_100_000)]
+        service.validatePayload = LicenseFixture.payload(machines: macs)
         service.onDeactivate = { service.activateError = nil }
         var outcome: PurchaseFlow.Outcome?
         let flow = makeFlow(service: service, onDone: { outcome = $1 })
 
         await flow.enterKey("DD-LIMIT-LIMIT-LIMIT-LIMIT")
         XCTAssertEqual(flow.step, .activationLimit(
-            key: "DD-LIMIT-LIMIT-LIMIT-LIMIT", machineIds: ["mac-a", "mac-b"]))
+            key: "DD-LIMIT-LIMIT-LIMIT-LIMIT", machines: macs),
+            "the sheet lists the two Macs by name")
 
         await flow.deactivateMachine(key: "DD-LIMIT-LIMIT-LIMIT-LIMIT", machineId: "mac-a")
         XCTAssertEqual(service.deactivateCalls.first?.machineId, "mac-a")

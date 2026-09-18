@@ -79,6 +79,30 @@ final class SettingsLicenseTests: XCTestCase {
         XCTAssertFalse(model.entitlementState.isEntitled)
     }
 
+    /// Settings > License lists Macs by the name they sent to the service,
+    /// marks this one, and falls back to the id tail for an unnamed slot.
+    func testMachineRowsAreNamedAndThisMacIsMarked() {
+        let mine = LicensedMachine(id: "abc123def456", name: "Studio", activatedAt: 1_800_000_000)
+        let other = LicensedMachine(id: "fedcba987654", name: "Laptop", activatedAt: nil)
+        let unnamed = LicensedMachine(id: "0000000000009f3c", name: "")
+        XCTAssertEqual(SettingsView.machineLabel(mine, thisMachineId: mine.id), "Studio (this Mac)")
+        XCTAssertEqual(SettingsView.machineLabel(other, thisMachineId: mine.id), "Laptop")
+        XCTAssertEqual(SettingsView.machineLabel(unnamed, thisMachineId: mine.id), "Mac \u{2026}9f3c")
+    }
+
+    /// The name this Mac reports is what the service stores and echoes back.
+    @MainActor
+    func testEnterLicenseKeySendsThisMacsNameAndItComesBack() async throws {
+        let service = FakeLicenseService()
+        let model = try makeModel(service: service)
+        await model.enterLicenseKey("DD-AAAAA-BBBBB-CCCCC-DDDDD")
+        let sent = try XCTUnwrap(service.activateCalls.first)
+        XCTAssertEqual(sent.machineName, MachineIdentity.machineName())
+        let payload = try XCTUnwrap(model.licensePayload)
+        XCTAssertEqual(payload.machines.map(\.name), [MachineIdentity.machineName()])
+        XCTAssertEqual(payload.machines.map(\.id), [MachineIdentity.machineId()])
+    }
+
     @MainActor
     func testRecoverSendsTheEmail() async throws {
         let service = FakeLicenseService()

@@ -20,7 +20,9 @@ documented at the top of `src/store.ts`.
 Client endpoints are rate-limited to 30/min per IP. `entitlement` is
 `base64url(payload JSON) + "." + base64url(Ed25519 signature)`; the payload is
 `{ key, plan, expiresAt, status, autoRenew, machines, issuedAt, machineId }`
-with dates as Unix epoch seconds. The app verifies the signature with the
+with dates as Unix epoch seconds; `machines` is `[{ id, name, activatedAt }]`
+(name as given to `/activate`, empty for a checkout pre-activation until the
+app activates). The app verifies the signature with the
 bundled public key before trusting any field.
 
 ## Local development

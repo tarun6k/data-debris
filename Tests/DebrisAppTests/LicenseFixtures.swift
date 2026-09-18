@@ -23,14 +23,14 @@ enum LicenseFixture {
         plan: LicensePlan = .oneYear,
         status: LicenseStatus = .active,
         autoRenew: Bool = false,
-        machines: [String] = ["machine-1"],
+        machines: [LicensedMachine] = [LicensedMachine(id: "machine-1", name: "Test Mac")],
         key: String = "DD-TESTK-EYFOR-APPXX-TESTS"
     ) -> EntitlementPayload {
         EntitlementPayload(
             key: key, plan: plan,
             expiresAt: Int(Date().addingTimeInterval(expiresIn).timeIntervalSince1970),
             status: status, autoRenew: autoRenew, machines: machines,
-            issuedAt: Int(Date().timeIntervalSince1970), machineId: machines[0])
+            issuedAt: Int(Date().timeIntervalSince1970), machineId: machines[0].id)
     }
 
     static func compact(_ payload: EntitlementPayload) -> String {
@@ -76,7 +76,9 @@ final class FakeLicenseService: LicenseService {
         activateCalls.append((key, machineId, machineName))
         if let error = activateError { throw error }
         return LicenseFixture.compact(LicenseFixture.payload(
-            machines: [machineId], key: key))
+            machines: [LicensedMachine(id: machineId, name: machineName,
+                                       activatedAt: Int(Date().timeIntervalSince1970))],
+            key: key))
     }
 
     func validate(key: String, machineId: String) async throws -> String {

@@ -2,13 +2,19 @@
 // The app verifies with CryptoKit (Curve25519.Signing.PublicKey, raw 32 bytes).
 // Dates are Unix epoch seconds so neither side has to parse ISO strings.
 
+export interface EntitlementMachine {
+  id: string;
+  name: string;
+  activatedAt: number;
+}
+
 export interface EntitlementPayload {
   key: string;
   plan: "oneYear" | "threeYears";
   expiresAt: number;
   status: "active" | "canceled" | "past_due" | "refunded";
   autoRenew: boolean;
-  machines: string[];
+  machines: EntitlementMachine[];
   issuedAt: number;
   machineId: string;
 }

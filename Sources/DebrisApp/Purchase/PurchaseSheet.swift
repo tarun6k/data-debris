@@ -30,22 +30,28 @@ struct PurchaseSheet: View {
             }
             .padding(24)
             .frame(width: 380)
-        case .activationLimit(let key, let machineIds):
+        case .activationLimit(let key, let machines):
             VStack(alignment: .leading, spacing: 12) {
                 Text("This key is already active on 2 Macs")
                     .font(.system(size: 15, weight: .semibold))
                 Text("Deactivate one of them to use the key on this Mac.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-                ForEach(machineIds, id: \.self) { machine in
+                ForEach(machines) { machine in
                     HStack {
-                        Text(machine)
-                            .font(.system(size: 11, design: .monospaced))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(machine.displayName)
+                                .font(.system(size: 12, weight: .medium))
+                                .lineLimit(1)
+                            if let date = machine.activatedDate {
+                                Text("Activated \(date.formatted(date: .abbreviated, time: .omitted))")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                         Spacer()
                         Button("Deactivate") {
-                            Task { await flow.deactivateMachine(key: key, machineId: machine) }
+                            Task { await flow.deactivateMachine(key: key, machineId: machine.id) }
                         }
                     }
                 }

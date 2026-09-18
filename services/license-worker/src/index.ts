@@ -91,7 +91,11 @@ async function signedEntitlement(env: Env, lic: License, machineId: string): Pro
     expiresAt: Math.floor(Date.parse(lic.expiresAt) / 1000),
     status: lic.status,
     autoRenew: lic.autoRenew,
-    machines: lic.machines.map((m) => m.machineId),
+    machines: lic.machines.map((m) => ({
+      id: m.machineId,
+      name: m.name,
+      activatedAt: Math.floor(Date.parse(m.activatedAt) / 1000),
+    })),
     issuedAt: Math.floor(Date.now() / 1000),
     machineId,
   };

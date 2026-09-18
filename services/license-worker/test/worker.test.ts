@@ -165,20 +165,36 @@ describe("activation", () => {
 
     expect((await post("/deactivate", { key, machineId: "m2" })).status).toBe(200);
     const payload = await verifiedPayload(await post("/activate", { key, machineId: "m3", machineName: "Spare" }));
-    expect(payload.machines.sort()).toEqual(["m1", "m3"]);
+    expect(payload.machines.map((m: any) => m.id).sort()).toEqual(["m1", "m3"]);
+  });
+
+  it("the entitlement lists each machine's id, name and activation time", async () => {
+    const { key } = await buy();
+    const before = Math.floor(Date.now() / 1000);
+    await post("/activate", { key, machineId: "m1", machineName: "Studio" });
+    const payload = await verifiedPayload(await post("/activate", { key, machineId: "m2", machineName: "Laptop" }));
+    expect(payload.machines.map((m: any) => [m.id, m.name])).toEqual([["m1", "Studio"], ["m2", "Laptop"]]);
+    for (const m of payload.machines) {
+      expect(typeof m.activatedAt).toBe("number");
+      expect(m.activatedAt).toBeGreaterThanOrEqual(before);
+      expect(m.activatedAt).toBeLessThanOrEqual(before + 60);
+    }
+    // Re-activating with a new name renames the slot; the id is unchanged.
+    const renamed = await verifiedPayload(await post("/activate", { key, machineId: "m2", machineName: "Laptop 2" }));
+    expect(renamed.machines[1]).toMatchObject({ id: "m2", name: "Laptop 2" });
   });
 
   it("re-activating the same machine is idempotent", async () => {
     const { key } = await buy();
     await post("/activate", { key, machineId: "m1", machineName: "Studio" });
     const payload = await verifiedPayload(await post("/activate", { key, machineId: "m1", machineName: "Studio" }));
-    expect(payload.machines).toEqual(["m1"]);
+    expect(payload.machines.map((m: any) => m.id)).toEqual(["m1"]);
   });
 
   it("a machineId passed at checkout is pre-activated", async () => {
     const { key } = await buy({ machineId: "m-checkout" });
     const payload = await verifiedPayload(await post("/validate", { key, machineId: "m-checkout" }));
-    expect(payload.machines).toEqual(["m-checkout"]);
+    expect(payload.machines.map((m: any) => [m.id, m.name])).toEqual([["m-checkout", ""]]);
   });
 
   it("unknown key is 404 on activate and validate", async () => {

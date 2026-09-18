@@ -100,20 +100,26 @@ struct SettingsView: View {
             .foregroundStyle(.secondary)
     }
 
+    /// "Studio (this Mac)" / "Laptop" — names as sent to the license service;
+    /// an unnamed slot (pre-activated at checkout) shows the tail of its id.
+    static func machineLabel(_ machine: LicensedMachine, thisMachineId: String) -> String {
+        machine.id == thisMachineId ? "\(machine.displayName) (this Mac)" : machine.displayName
+    }
+
     private func machines(_ payload: EntitlementPayload) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Macs used (\(payload.machines.count) of 2)")
-            ForEach(payload.machines, id: \.self) { machine in
+            let thisMachine = MachineIdentity.machineId()
+            ForEach(payload.machines) { machine in
                 HStack(spacing: 8) {
-                    Text(machine)
-                        .font(.system(size: 11, design: .monospaced))
+                    Text(Self.machineLabel(machine, thisMachineId: thisMachine))
+                        .font(.system(size: 12))
                         .lineLimit(1)
-                        .truncationMode(.middle)
-                        .foregroundStyle(.secondary)
-                    if machine == MachineIdentity.machineId() {
-                        Text("this Mac")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Theme.teal)
+                        .foregroundStyle(machine.id == thisMachine ? Theme.teal : .secondary)
+                    if let date = machine.activatedDate {
+                        Text("· since \(date.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }

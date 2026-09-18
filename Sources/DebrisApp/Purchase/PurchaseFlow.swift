@@ -34,8 +34,9 @@ final class PurchaseFlow: ObservableObject, Identifiable {
         case privacy
         case plan
         case waiting(shortReference: String)
-        /// 409 from activate: the key is on 2 Macs already; offer Manage Macs.
-        case activationLimit(key: String, machineIds: [String])
+        /// 409 from activate: the key is on 2 Macs already; list them by
+        /// name so the user can free one.
+        case activationLimit(key: String, machines: [LicensedMachine])
         case failed(message: String, retryKey: String?)
     }
 
@@ -169,10 +170,10 @@ final class PurchaseFlow: ObservableObject, Identifiable {
             guard let (payload, _) = store.load() else { throw LicenseStoreError.badEntitlement }
             finish(.activated(payload))
         } catch LicenseClientError.activationLimit {
-            // The entitlement from validate carries the two machine ids.
-            let ids = (try? await service.validate(key: key, machineId: machineId))
+            // The entitlement from validate carries the two machines by name.
+            let machines = (try? await service.validate(key: key, machineId: machineId))
                 .flatMap { SignedEntitlement.verify($0, publicKey: publicKey)?.machines } ?? []
-            step = .activationLimit(key: key, machineIds: ids)
+            step = .activationLimit(key: key, machines: machines)
         } catch LicenseClientError.unknownKey {
             step = .failed(message: "That key was not found. Check it against the email from your purchase.",
                            retryKey: nil)

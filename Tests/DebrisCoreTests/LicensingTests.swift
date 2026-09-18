@@ -43,7 +43,7 @@ final class LicensingTests: XCTestCase {
         expiresIn: TimeInterval,
         plan: LicensePlan = .oneYear,
         autoRenew: Bool = false,
-        machines: [String] = ["m1"]
+        machines: [LicensedMachine] = [LicensedMachine(id: "m1", name: "Studio", activatedAt: 1_799_990_000)]
     ) -> EntitlementPayload {
         EntitlementPayload(
             key: "DD-TESTKEY", plan: plan,
@@ -80,7 +80,7 @@ final class LicensingTests: XCTestCase {
     func testActive() throws {
         let p = payload(expiresIn: 200 * 86_400, plan: .threeYears, autoRenew: true)
         XCTAssertEqual(derive(p), .active(plan: .threeYears, expiresAt: p.expiryDate,
-                                          autoRenew: true, machines: ["m1"]))
+                                          autoRenew: true, machines: p.machines))
         XCTAssertEqual(try entitlements(p).state, derive(p))
     }
 
@@ -162,6 +162,46 @@ final class LicensingTests: XCTestCase {
         backing.blob = try JSONEncoder().encode(stored)
         XCTAssertNil(store().load())
         XCTAssertEqual(Entitlements(store: store(), now: { self.now }).state, .free)
+    }
+
+    /// The worker's JSON shape: machines as {id, name, activatedAt}.
+    func testNamedMachinesRoundTripThroughTheWire() throws {
+        let json = """
+        {"key":"DD-TESTKEY","plan":"oneYear","expiresAt":1900000000,"status":"active",
+         "autoRenew":false,"issuedAt":1800000000,"machineId":"m1",
+         "machines":[{"id":"m1","name":"Studio","activatedAt":1799990000},
+                     {"id":"m2","name":"","activatedAt":1799995000}]}
+        """
+        let decoded = try JSONDecoder().decode(EntitlementPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.machines, [
+            LicensedMachine(id: "m1", name: "Studio", activatedAt: 1_799_990_000),
+            LicensedMachine(id: "m2", name: "", activatedAt: 1_799_995_000),
+        ])
+        XCTAssertEqual(decoded.machines[0].displayName, "Studio")
+        XCTAssertEqual(decoded.machines[1].displayName, "Mac \u{2026}m2")
+        XCTAssertEqual(decoded.machines[0].activatedDate, Date(timeIntervalSince1970: 1_799_990_000))
+        // Signed as-is, it verifies and reads back identical.
+        let signed = try compact(decoded)
+        XCTAssertEqual(SignedEntitlement.verify(signed, publicKey: publicKey), decoded)
+    }
+
+    /// Entitlements issued before names existed carry plain ids. They are
+    /// still validly signed and must keep working — as unnamed machines.
+    func testLegacyIdOnlyMachinesStillDecode() throws {
+        let json = """
+        {"key":"DD-TESTKEY","plan":"oneYear","expiresAt":1900000000,"status":"active",
+         "autoRenew":false,"issuedAt":1800000000,"machineId":"m1","machines":["m1","m2"]}
+        """
+        let decoded = try JSONDecoder().decode(EntitlementPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.machines, [LicensedMachine(id: "m1"), LicensedMachine(id: "m2")])
+        XCTAssertNil(decoded.machines[0].activatedAt)
+        // Signed in the legacy shape, the store still trusts it.
+        let body = Data(json.utf8)
+        let legacy = "\(b64url(body)).\(b64url(try signingKey.signature(for: body)))"
+        let s = store()
+        try s.save(licenseKey: "DD-TESTKEY", entitlement: legacy, lastValidatedAt: now)
+        XCTAssertEqual(try XCTUnwrap(s.load()).payload.machines.map(\.id), ["m1", "m2"])
+        XCTAssertTrue(Entitlements(store: s, now: { self.now }).state.isEntitled)
     }
 
     func testSignatureFromAnotherKeyIsRejected() throws {
