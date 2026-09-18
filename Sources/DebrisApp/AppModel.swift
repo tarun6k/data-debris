@@ -701,6 +701,18 @@ final class AppModel: ObservableObject {
         entitlementState = entitlements.state
     }
 
+    #if DEBUG
+    /// Settings > License in Debug builds only: forget the Keychain item this
+    /// build can see (`AppPaths.keychainService`, ".debug" under a routed
+    /// profile) and drop back to Free, agents included.
+    func resetLicenseForThisBuild() {
+        licenseStore.clear()
+        refreshEntitlement()
+        entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)
+        licenseToast = "License cleared for this build"
+    }
+    #endif
+
     /// Every locked action funnels through here: allowed = proceed; otherwise
     /// the purchase flow starts and, on activation, resumes the action.
     @discardableResult

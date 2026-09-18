@@ -68,6 +68,7 @@ struct SettingsView: View {
                     Button("Enter a different key") { showingLicenseEntry = true }
                     Button("Recover my key by email") { showingLicenseEntry = true }
                 }
+                debugResetRow
             }
         } else {
             Section("License") {
@@ -86,8 +87,23 @@ struct SettingsView: View {
                         .tint(Theme.teal)
                     Button("Already have a license?") { showingLicenseEntry = true }
                 }
+                debugResetRow
             }
         }
+    }
+
+    /// Debug builds only. Ad-hoc signed builds each get their own Keychain
+    /// ACL, so a stale item from an earlier build can shadow a fresh one.
+    @ViewBuilder
+    private var debugResetRow: some View {
+        #if DEBUG
+        HStack(spacing: 10) {
+            Button("Reset license (this build)") { model.resetLicenseForThisBuild() }
+            Text(AppPaths.keychainService)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.tertiary)
+        }
+        #endif
     }
 
     /// No price before the privacy sheet is acknowledged — the summary lists
