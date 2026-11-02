@@ -1,18 +1,19 @@
 #!/bin/zsh
-# scripts/make-dmg.sh — build/release/DataDebris-<version>.dmg with hdiutil.
+# scripts/make-dmg.sh — build/release/DataDebris-<version>[suffix].dmg with
+# hdiutil, plus a .sha256 next to it.
 #
 # Layout: the app on the left, an "Applications" link on the right, the app
-# icon as the volume icon. Finder positions the two icons (best effort; the
-# DMG is still valid if Finder scripting is unavailable). The volume icon is
-# added after the Finder pass: Finder removes .VolumeIcon.icns and clears the
-# custom-icon flag when it rewrites the folder. Signs the DMG when
+# icon as the volume icon. Finder positions the two icons (best effort, 60 s
+# cap; the DMG is still valid if Finder scripting is unavailable). The volume
+# icon is added after the Finder pass: Finder removes .VolumeIcon.icns and
+# clears the custom-icon flag when it rewrites the folder. Signs the DMG when
 # DEVELOPER_ID_APP is set; notarize.sh can then staple it.
 source "$(dirname "$0")/release-env.sh"
 [[ -d $APP ]] || { print -u2 "run build-release.sh first ($APP missing)"; exit 1 }
 
 STAGING=$OUT/dmg-root
 RW=$OUT/$PRODUCT-rw.dmg
-rm -rf "$STAGING" "$RW" "$DMG"
+rm -rf "$STAGING" "$RW" "$DMG" "$DMG.sha256"
 mkdir -p "$STAGING"
 cp -R "$APP" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
@@ -24,7 +25,9 @@ MOUNT=$(hdiutil attach -readwrite -noverify "$RW" | awk -F'\t' '/\/Volumes\//{pr
 [[ -n $MOUNT ]] || { print -u2 "mount failed"; exit 1 }
 
 say "Finder layout"
-osascript - "$MOUNT" "$PRODUCT" <<'APPLESCRIPT' || warn "Finder layout skipped (osascript failed); the DMG still works."
+# perl's alarm caps the Finder pass: an unanswered Automation prompt (CI, a
+# fresh Mac) must not hang the build.
+perl -e 'alarm shift; exec @ARGV' 60 osascript - "$MOUNT" "$PRODUCT" <<'APPLESCRIPT' || warn "Finder layout skipped (osascript failed or timed out); the DMG still works."
 on run argv
   set mountPath to item 1 of argv
   set appName to item 2 of argv
@@ -51,9 +54,13 @@ end run
 APPLESCRIPT
 
 say "volume icon"
-cp "$APP/Contents/Resources/AppIcon.icns" "$MOUNT/.VolumeIcon.icns"
-SETFILE=$(xcrun --find SetFile 2>/dev/null || true)
-if [[ -n $SETFILE ]]; then "$SETFILE" -a C "$MOUNT"; else warn "SetFile not found; the volume icon flag was not set."; fi
+if [[ -f "$APP/Contents/Resources/AppIcon.icns" ]]; then
+  cp "$APP/Contents/Resources/AppIcon.icns" "$MOUNT/.VolumeIcon.icns"
+  SETFILE=$(xcrun --find SetFile 2>/dev/null || true)
+  if [[ -n $SETFILE ]]; then "$SETFILE" -a C "$MOUNT"; else warn "SetFile not found; the volume icon flag was not set."; fi
+else
+  warn "AppIcon.icns missing; no volume icon."
+fi
 sync
 hdiutil detach -quiet "$MOUNT"
 
@@ -67,4 +74,19 @@ if [[ -n ${DEVELOPER_ID_APP:-} ]]; then
 else
   warn "DEVELOPER_ID_APP is not set: the DMG is unsigned."
 fi
+
+say "verify dmg"
+VERIFY=$(hdiutil attach -readonly -nobrowse -noverify "$DMG" | awk -F'\t' '/\/Volumes\//{print $NF}')
+[[ -n $VERIFY ]] || { print -u2 "the DMG did not mount"; exit 1 }
+if [[ -d "$VERIFY/$PRODUCT.app" && -L "$VERIFY/Applications" ]]; then
+  print -- "mounted at $VERIFY: $PRODUCT.app and Applications link present"
+else
+  ls -la "$VERIFY"; hdiutil detach -quiet "$VERIFY"; print -u2 "DMG layout wrong"; exit 1
+fi
+codesign --verify --deep --strict "$VERIFY/$PRODUCT.app" && print -- "app inside the DMG verifies"
+hdiutil detach -quiet "$VERIFY"
+
+# sha256 with the bare file name, so `shasum -c` works from the download folder.
+(cd "$OUT" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256")
 print -- "dmg: $DMG ($(du -h "$DMG" | cut -f1))"
+print -- "sha: $DMG.sha256 — $(cat "$DMG.sha256")"

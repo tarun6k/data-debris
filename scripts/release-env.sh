@@ -23,7 +23,8 @@ say()  { print -- "--- $*" }
 # Version and build from project.yml (the generated project mirrors them).
 VERSION=$(sed -n 's/^ *MARKETING_VERSION: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$REPO/project.yml" | head -1)
 BUILD=$(sed -n 's/^ *CURRENT_PROJECT_VERSION: *\([0-9]*\).*/\1/p' "$REPO/project.yml" | head -1)
-DMG=$OUT/$PRODUCT-$VERSION.dmg
+# DMG_SUFFIX (optional, e.g. "-beta.1" from the release tag) keeps beta builds apart.
+DMG=$OUT/$PRODUCT-$VERSION${DMG_SUFFIX:-}.dmg
 
 # Release AppConfig values the scripts must agree with.
 FEED_URL=$(plutil -extract Release.UpdateFeedURL raw -o - "$REPO/Sources/DebrisApp/Resources/AppConfig.plist")
