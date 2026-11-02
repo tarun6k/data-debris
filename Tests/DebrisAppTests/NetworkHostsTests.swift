@@ -73,10 +73,27 @@ final class NetworkHostsTests: XCTestCase {
     }
 
     /// The built bundle links nothing but our own framework and Sparkle.
+    /// Xcode 16 (the CI runner) copies its own test-run support into the
+    /// hosted app's Frameworks folder (XCTest*, XCUI*, XCUnit, Testing,
+    /// libXCTest*); Xcode 27 does not. Those are Xcode's, not ours.
     func testBundledFrameworksAreOnlyCoreAndSparkle() throws {
         let frameworks = Bundle.main.bundleURL.appendingPathComponent("Contents/Frameworks")
         let names = try FileManager.default.contentsOfDirectory(atPath: frameworks.path)
-            .filter { !$0.hasPrefix(".") }.sorted()
+            .filter { !$0.hasPrefix(".") && !Self.isXcodeTestSupport($0) }.sorted()
         XCTAssertEqual(names, ["DebrisCore.framework", "Sparkle.framework"])
+    }
+
+    static func isXcodeTestSupport(_ name: String) -> Bool {
+        name.hasPrefix("XC") || name.hasPrefix("libXC") || name == "Testing.framework"
+    }
+
+    func testXcodeTestSupportFilterLeavesOurFrameworksAlone() {
+        for name in ["XCTest.framework", "XCUIAutomation.framework", "XCUnit.framework",
+                     "libXCTestBundleInject.dylib", "libXCTestSwiftSupport.dylib", "Testing.framework"] {
+            XCTAssertTrue(Self.isXcodeTestSupport(name), name)
+        }
+        for name in ["DebrisCore.framework", "Sparkle.framework", "libcurl.dylib", "Alamofire.framework"] {
+            XCTAssertFalse(Self.isXcodeTestSupport(name), name)
+        }
     }
 }
