@@ -1,0 +1,126 @@
+name: Release
+
+# Tag push (v0.9.0-beta.1): tests, tag check, DMG, GitHub release.
+# workflow_dispatch: the same build on any branch with the DMG uploaded as a
+# run artifact only — a dry run of the packaging that cuts no release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Test, package, publish (macOS)
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcodegen --version
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: ${{ runner.os }}-spm-
+
+      # v0.9.0-beta.1 → the part before the first hyphen must equal
+      # MARKETING_VERSION in project.yml; the rest (-beta.1) becomes the DMG
+      # suffix, and any hyphen marks the GitHub release as a pre-release.
+      - name: Check the tag against MARKETING_VERSION
+        id: version
+        run: |
+          VERSION=$(sed -n 's/^ *MARKETING_VERSION: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' project.yml | head -1)
+          echo "MARKETING_VERSION=$VERSION"
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            TAG=$GITHUB_REF_NAME
+            BASE=${TAG#v}; BASE=${BASE%%-*}
+            if [[ $BASE != "$VERSION" ]]; then
+              echo "::error::tag $TAG does not match MARKETING_VERSION $VERSION in project.yml"
+              exit 1
+            fi
+            SUFFIX=${TAG#v}; SUFFIX=${SUFFIX#"$BASE"}
+            if [[ $TAG == *-* ]]; then PRERELEASE=true; else PRERELEASE=false; fi
+          else
+            SUFFIX=-dev.$(git rev-parse --short HEAD)
+            PRERELEASE=true
+          fi
+          echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      # The gate: the S1–S10 invariants live in these tests (as in ci.yml).
+      - name: Run tests
+        run: make test
+
+      # Universal Release archive, ad-hoc signature with Hardened Runtime
+      # applied inside out, DMG and .sha256 in build/release/.
+      - name: Build the DMG
+        env:
+          DMG_SUFFIX: ${{ steps.version.outputs.suffix }}
+        run: make dist
+
+      # The ad-hoc app must actually start: Hardened Runtime library
+      # validation is what the signing step in build-release.sh works around.
+      - name: Launch smoke test
+        run: |
+          open -n build/release/DataDebris.app
+          sleep 15
+          if pgrep -x DataDebris >/dev/null; then
+            echo "DataDebris is running"
+            pkill -x DataDebris || true
+          else
+            echo "::error::DataDebris did not stay running"
+            ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head
+            for f in ~/Library/Logs/DiagnosticReports/DataDebris*; do
+              [[ -f $f ]] && head -80 "$f"
+            done
+            exit 1
+          fi
+
+      - name: Upload the DMG as a run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DataDebris-dmg
+          path: |
+            build/release/*.dmg
+            build/release/*.sha256
+          if-no-files-found: error
+
+      - name: Release notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          awk -v v="$VERSION" '/^## \[/{p = index($0, "[" v "]") > 0} p' CHANGELOG.md > build/release/notes.md
+          if [[ ! -s build/release/notes.md ]]; then
+            echo "::warning::no CHANGELOG.md entry for $VERSION"
+            echo "Data Debris $GITHUB_REF_NAME" > build/release/notes.md
+          fi
+          cat build/release/notes.md
+
+      - name: Publish the GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          FLAGS=()
+          if [[ $PRERELEASE == true ]]; then FLAGS+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "Data Debris $GITHUB_REF_NAME" \
+            --notes-file build/release/notes.md "${FLAGS[@]}" \
+            build/release/*.dmg build/release/*.sha256
