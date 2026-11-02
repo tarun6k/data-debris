@@ -31,9 +31,15 @@ enum PlanPricing {
 }
 
 /// Screen 13 — three cards, auto-renew off by default, checkout in the browser.
+/// Without a configured checkout (the beta) the cards stay, the Get buttons,
+/// the auto-renew toggle and the checkout footer go, and one line says why.
 struct ChoosePlanSheet: View {
     @ObservedObject var flow: PurchaseFlow
     var config = LicenseConfig.current
+
+    /// Shown in place of the plan buttons when checkout is not configured.
+    static let notConfiguredNote =
+        "Cleaning unlocks in version 1.0. This beta is scan and review only, on the Free plan."
 
     @State private var showingLicenseEntry = false
     /// priceId → localized total from Paddle's pricing preview; empty = USD.
@@ -64,18 +70,26 @@ struct ChoosePlanSheet: View {
             }
             .padding(.horizontal, 24)
 
-            Toggle(isOn: $flow.autoRenew) {
-                HStack(spacing: 6) {
-                    Text("Renew automatically at the end of the term")
-                        .font(.system(size: 13, weight: .medium))
-                    Text("(we email you 14 days before)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+            if config.isConfigured {
+                Toggle(isOn: $flow.autoRenew) {
+                    HStack(spacing: 6) {
+                        Text("Renew automatically at the end of the term")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("(we email you 14 days before)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .toggleStyle(.checkbox)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+            } else {
+                Text(Self.notConfiguredNote)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
             }
-            .toggleStyle(.checkbox)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 14)
 
             Divider()
             footer
@@ -124,12 +138,14 @@ struct ChoosePlanSheet: View {
                 .font(.system(size: 12)).foregroundStyle(.secondary)
             bulletList(bullets)
             Spacer(minLength: 12)
-            Button(plan == .oneYear ? "Get 1 Year" : "Get 3 Years") {
-                flow.choosePlan(plan)
+            if config.isConfigured {
+                Button(plan == .oneYear ? "Get 1 Year" : "Get 3 Years") {
+                    flow.choosePlan(plan)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.teal)
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.teal)
-            .frame(maxWidth: .infinity)
         }
     }
 
@@ -172,8 +188,10 @@ struct ChoosePlanSheet: View {
 
     private var footer: some View {
         HStack(spacing: 4) {
-            Text("Checkout opens in your browser · 14-day refund · VAT/GST shown at checkout ·")
-                .foregroundStyle(.secondary)
+            if config.isConfigured {
+                Text("Checkout opens in your browser · 14-day refund · VAT/GST shown at checkout ·")
+                    .foregroundStyle(.secondary)
+            }
             Button("Already have a license?") { showingLicenseEntry = true }
                 .buttonStyle(.plain)
                 .foregroundStyle(Theme.teal)

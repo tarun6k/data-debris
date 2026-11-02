@@ -20,7 +20,20 @@ struct LicenseConfig {
         return priceIds[key]
     }
 
-    var isConfigured: Bool { workerURL != nil }
+    /// The four price ids every checkout needs, by their .env / Info.plist names.
+    static let requiredPriceKeys = [
+        "PADDLE_PRICE_1Y_RECURRING", "PADDLE_PRICE_1Y_ONETIME",
+        "PADDLE_PRICE_3Y_RECURRING", "PADDLE_PRICE_3Y_ONETIME",
+    ]
+
+    /// True only when a checkout can actually open: the license service, the
+    /// Paddle client token and all four price ids. A build without the Paddle
+    /// values (the 0.9 beta: no .env, no Info.plist keys) is not configured,
+    /// so the plan sheet hides its buttons instead of ending in a toast.
+    var isConfigured: Bool {
+        workerURL != nil && paddleClientToken != nil
+            && Self.requiredPriceKeys.allSatisfy { priceIds[$0] != nil }
+    }
 
     static let current = load()
 

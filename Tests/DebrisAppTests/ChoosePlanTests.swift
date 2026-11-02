@@ -40,4 +40,28 @@ final class ChoosePlanTests: XCTestCase {
 
         XCTAssertNil(PaddlePricing.parse(Data("{\"error\":{}}".utf8)))
     }
+
+    /// No Paddle values (the beta: no .env, no Info.plist keys) means no
+    /// checkout, so the sheet hides its plan buttons and says why in copy
+    /// that follows the rules.
+    func testCheckoutIsConfiguredOnlyWithTokenAndAllPriceIds() {
+        let worker = URL(string: "https://l.example.test")!
+        let prices = Dictionary(uniqueKeysWithValues:
+            LicenseConfig.requiredPriceKeys.map { ($0, "pri_" + $0) })
+        func config(worker: URL? = worker, token: String? = "tok",
+                    prices: [String: String] = prices) -> LicenseConfig {
+            LicenseConfig(workerURL: worker, paddleClientToken: token,
+                          paddleEnv: "sandbox", priceIds: prices)
+        }
+        XCTAssertTrue(config().isConfigured)
+        XCTAssertFalse(config(token: nil).isConfigured)
+        XCTAssertFalse(config(worker: nil).isConfigured)
+        var missingOne = prices
+        missingOne["PADDLE_PRICE_3Y_ONETIME"] = nil
+        XCTAssertFalse(config(prices: missingOne).isConfigured)
+        XCTAssertFalse(config(prices: [:]).isConfigured)
+
+        XCTAssertTrue(ChoosePlanSheet.notConfiguredNote.contains("1.0"))
+        XCTAssertFalse(ChoosePlanSheet.notConfiguredNote.contains("!"))
+    }
 }
