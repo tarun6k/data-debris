@@ -155,6 +155,9 @@ time.
 On a clean Mac (or a fresh user account):
 
 - Gatekeeper opens the app with no warning; it prompts to move itself to `/Applications`.
+  (This is the Developer ID build. The ad-hoc 0.9 beta from `make dist` is blocked on
+  first launch until Open Anyway in System Settings › Privacy & Security; the README's
+  Install section has the exact steps.)
 - A scan reports sensible numbers and **no** protected path appears as removable.
 - Clean → Undo round-trips: files return to their original paths.
 - Purchase against Paddle Sandbox issues a key; activate on two Macs, and confirm a third

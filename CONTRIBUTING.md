@@ -83,3 +83,39 @@ second; rotation is what actually protects you.
 Executing the built binary directly makes it inherit the terminal's TCC permissions, which
 makes Trash restore fail in confusing ways. Use `make run` (which uses `open`) so the app
 gets its own permission context.
+
+## Release
+
+A release is a tag; the Release workflow ([`.github/workflows/release.yml`](.github/workflows/release.yml))
+does the rest. Nothing is built or uploaded by hand.
+
+1. Bump `MARKETING_VERSION` in [`project.yml`](project.yml) (and `CURRENT_PROJECT_VERSION`,
+   which Sparkle compares) and add the entry to [`CHANGELOG.md`](CHANGELOG.md).
+2. Commit:
+
+   ```sh
+   git commit -am "chore(release): 0.9.0-beta.1"
+   ```
+
+3. Tag. The part before the first hyphen must equal `MARKETING_VERSION`, or the workflow
+   fails before building anything; a hyphen (`-beta.1`, `-rc.1`) marks a pre-release.
+
+   ```sh
+   git tag v0.9.0-beta.1
+   ```
+
+4. Push the tag:
+
+   ```sh
+   git push origin v0.9.0-beta.1
+   ```
+
+The workflow runs `make test` first, checks the tag, runs `make dist` (universal Release
+archive, ad-hoc signed with Hardened Runtime, DMG and `.sha256`), launches the app once to
+prove the signature loads its frameworks, and attaches `DataDebris-0.9.0-beta.1.dmg` and
+`DataDebris-0.9.0-beta.1.dmg.sha256` to a GitHub release. Run `make dist` locally to get the
+same DMG in `build/release/`. `make release` is the Developer ID chain (notarization,
+signed appcast) for 1.0; it needs the identities in `scripts/release-env.sh`.
+
+A dry run of the packaging on any branch: Actions → Release → Run workflow. It builds,
+tests and uploads the DMG as a run artifact without creating a release.
