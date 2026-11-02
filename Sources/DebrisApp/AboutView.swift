@@ -10,6 +10,10 @@ enum AppInfo {
     }
     /// "1.0 (1)"
     static var versionString: String { "\(version) (\(build))" }
+    /// A 0.x version is a beta: Settings shows a Beta label next to it, and
+    /// the label disappears with the first 1.0 build without a code change.
+    static var isBeta: Bool { isBeta(version) }
+    static func isBeta(_ version: String) -> Bool { version.hasPrefix("0") }
     static var macOSVersion: String { ProcessInfo.processInfo.operatingSystemVersionString }
     static let author = "Tarun Kumar"
 }
@@ -47,7 +51,20 @@ struct AboutSection: View {
 
     var body: some View {
         Section("About") {
-            row("Version", AppInfo.versionString)
+            HStack(spacing: 8) {
+                Text("Version")
+                Spacer()
+                if AppInfo.isBeta {
+                    Text("Beta")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.teal)
+                        .padding(.horizontal, 7)
+                        .frame(height: 18)
+                        .background(Theme.teal.opacity(0.12), in: Capsule())
+                        .accessibilityLabel("Beta build")
+                }
+                Text(AppInfo.versionString).foregroundStyle(.secondary)
+            }
             HStack {
                 Text("Data Debris by \(AppInfo.author)")
                 Spacer()
