@@ -25,6 +25,9 @@ struct CatalogueWhatsNewSheet: View {
                                     Text(rule.category.displayName)
                                         .font(.system(size: 11))
                                         .foregroundStyle(.secondary)
+                                    Text(Self.autoCleanNote(for: rule))
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
                                 }
                                 Text(rule.reason)
                                     .font(.system(size: 12))
@@ -57,5 +60,11 @@ struct CatalogueWhatsNewSheet: View {
         }
         .padding(24)
         .frame(width: 520)
+    }
+
+    /// Every new rule starts off for Auto Clean (S9); review-only rules can
+    /// never be turned on there.
+    static func autoCleanNote(for rule: Rule) -> String {
+        rule.autoCleanEligible ? "Off for Auto Clean" : "Review only · never in Auto Clean"
     }
 }

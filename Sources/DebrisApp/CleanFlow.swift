@@ -27,8 +27,9 @@ final class CleanFlow: ObservableObject, Identifiable {
     @Published private(set) var disposal: Disposal = .trash
     /// The second confirmation for "Delete permanently" (S3).
     @Published var confirmingPermanent = false
-    /// No-Trash-volume items the user unticked: left out of the run.
-    @Published private(set) var uncheckedNoTrashPaths: Set<String> = []
+    /// Items the user unticked in Review (no-Trash volumes, Docker objects):
+    /// left out of the run. Keyed by PlanItem.originalPath.
+    @Published private(set) var uncheckedPaths: Set<String> = []
     @Published private(set) var quittingBundleIds: Set<String> = []
 
     // Cleaning
@@ -40,6 +41,8 @@ final class CleanFlow: ObservableObject, Identifiable {
     @Published private(set) var result: RunResult?
     @Published private(set) var runError: String?
     @Published private(set) var skippedItems: [ItemRecord] = []
+    /// Docker objects the run removed: gone for good, not in the Trash.
+    @Published private(set) var removedDockerCount = 0
     @Published private(set) var undo: UndoAvailability = .unavailable(.nothingMoved)
     @Published private(set) var restoredCount: Int?
     @Published private(set) var freeNow: Int64 = 0
@@ -69,15 +72,20 @@ final class CleanFlow: ObservableObject, Identifiable {
 
     // MARK: - What Clean will actually touch
 
-    /// Mirrors the executor's own skip filter, minus unticked no-Trash items.
+    /// Mirrors the executor's own skip filter, minus unticked items.
     var effectiveItems: [PlanItem] {
         plan.items.filter {
             ($0.ownerBundleId.map { !plan.skipBundleIds.contains($0) } ?? true)
-                && !uncheckedNoTrashPaths.contains($0.originalPath)
+                && !uncheckedPaths.contains($0.originalPath)
         }
     }
 
     var effectiveBytes: Int64 { effectiveItems.reduce(0) { $0 + $1.allocatedSize } }
+
+    /// Docker objects still ticked: removed with the docker CLI, no undo.
+    var dockerItemCount: Int {
+        effectiveItems.filter { DockerObject(storedPath: $0.originalPath) != nil }.count
+    }
 
     struct CategoryGroup: Identifiable {
         let category: Category
@@ -158,8 +166,10 @@ final class CleanFlow: ObservableObject, Identifiable {
         }
     }
 
-    func toggleNoTrashItem(_ path: String) {
-        uncheckedNoTrashPaths.formSymmetricDifference([path])
+    /// Per-item tick in Review for items that cannot come back from the
+    /// Trash: no-Trash volumes (S3) and Docker objects (spec §6).
+    func toggleItem(_ path: String) {
+        uncheckedPaths.formSymmetricDifference([path])
     }
 
     func exportList() {
@@ -175,7 +185,7 @@ final class CleanFlow: ObservableObject, Identifiable {
 
     func startClean() {
         guard stage == .review, !effectiveItems.isEmpty else { return }
-        let kept = selection.filter { !uncheckedNoTrashPaths.contains($0.url.path) }
+        let kept = selection.filter { !uncheckedPaths.contains($0.storedPath) }
         var finalPlan = planner.plan(selection: kept, request: Self.request(entry, disposal))
         finalPlan.skipBundleIds = plan.skipBundleIds
         // Any no-Trash item still here was left ticked next to its "deleted
@@ -214,6 +224,9 @@ final class CleanFlow: ObservableObject, Identifiable {
         if let runId = result?.runId {
             let items = (try? model.history.items(runId: runId)) ?? []
             skippedItems = items.filter { $0.status == .skipped }
+            removedDockerCount = items.filter {
+                $0.status == .irreversible && DockerObject(storedPath: $0.originalPath) != nil
+            }.count
             undo = (try? model.history.undoAvailability(runId: runId))
                 ?? .unavailable(.nothingMoved)
         }

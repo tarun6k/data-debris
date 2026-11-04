@@ -62,17 +62,26 @@ struct CategoryDetailView: View {
         var items = model.visibleFindings(in: category)
         if !filter.isEmpty {
             items = items.filter {
-                $0.url.lastPathComponent.localizedCaseInsensitiveContains(filter)
-                    || $0.url.path.localizedCaseInsensitiveContains(filter)
+                Self.name(for: $0).localizedCaseInsensitiveContains(filter)
+                    || $0.storedPath.localizedCaseInsensitiveContains(filter)
             }
         }
         switch sort {
         case .size: items.sort { $0.allocatedSize > $1.allocatedSize }
-        case .name: items.sort { $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedAscending }
+        case .name: items.sort { Self.name(for: $0).localizedCaseInsensitiveCompare(Self.name(for: $1)) == .orderedAscending }
         case .date: items.sort { $0.mtime > $1.mtime }
         }
         return items
     }
+
+    /// Row title: the file name, or "Docker image <id>" for Docker objects.
+    private static func name(for finding: Finding) -> String {
+        finding.dockerObject?.displayName ?? finding.url.lastPathComponent
+    }
+
+    /// Docker objects group under their own heading whatever the grouping:
+    /// they have no owner app and no folder.
+    private static let dockerGroupName = "Docker"
 
     private struct ItemGroup: Identifiable {
         let name: String
@@ -89,9 +98,13 @@ struct CategoryDetailView: View {
         case .none:
             return [ItemGroup(name: "", items: items, bytes: items.reduce(0) { $0 + $1.allocatedSize })]
         case .byApp:
-            return grouped(items) { Self.appName(for: $0.ownerBundleId) }
+            return grouped(items) {
+                $0.dockerObject != nil ? Self.dockerGroupName : Self.appName(for: $0.ownerBundleId)
+            }
         case .folder:
-            return grouped(items) { Format.tildePath($0.url.deletingLastPathComponent()) }
+            return grouped(items) {
+                $0.dockerObject != nil ? Self.dockerGroupName : Format.tildePath($0.url.deletingLastPathComponent())
+            }
         }
     }
 
@@ -199,12 +212,19 @@ struct CategoryDetailView: View {
     }
 
     private func groupHeader(_ group: ItemGroup) -> some View {
-        let ids = group.items.filter(\.isReclaimable).map(\.id)
+        // Docker objects are confirmed one by one (spec §6): the group tick
+        // never sweeps them in.
+        let ids = group.items.filter { $0.isReclaimable && $0.dockerObject == nil }.map(\.id)
         let selected = ids.filter { model.selectedIds.contains($0) }.count
         let state: CategoryState = selected == 0 ? .none : (selected == ids.count ? .all : .some)
+        let hasDocker = group.items.contains { $0.dockerObject != nil }
         return HStack(spacing: 10) {
-            TriStateCheckbox(state: state) {
-                model.setSelected(ids, state != .all)
+            if ids.isEmpty {
+                Spacer().frame(width: 16)
+            } else {
+                TriStateCheckbox(state: state) {
+                    model.setSelected(ids, state != .all)
+                }
             }
             Text(group.name)
                 .font(.system(size: 13, weight: .semibold))
@@ -213,6 +233,11 @@ struct CategoryDetailView: View {
                 .font(.system(size: 12))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
+            if hasDocker {
+                Text("tick each item · removed with docker, no undo")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
             ByteText(bytes: group.bytes)
                 .font(.system(size: 13))
@@ -233,7 +258,7 @@ struct CategoryDetailView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
-                    Text(finding.url.lastPathComponent)
+                    Text(Self.name(for: finding))
                         .font(.system(size: 13))
                     if let owner = finding.ownerBundleId, running.contains(owner) {
                         Text("In use · \(Self.appName(for: owner)) running")
@@ -244,7 +269,13 @@ struct CategoryDetailView: View {
                             .background(.orange.opacity(0.16), in: Capsule())
                     }
                 }
-                PathText(url: finding.url)
+                if finding.dockerObject != nil {
+                    Text("Removed with docker · cannot be undone")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                } else {
+                    PathText(url: finding.url)
+                }
                 Text("\(finding.reason) · \(finding.consequence)")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
@@ -264,34 +295,46 @@ struct CategoryDetailView: View {
         .tag(finding.id)
         .contextMenu {
             Button("Exclude item") { neverTouch([finding]) }
-            Button("Exclude folder") {
-                model.excludeFolder(finding.url.deletingLastPathComponent().path)
-                showToast()
-            }
-            Button("Copy path") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(finding.url.path, forType: .string)
-            }
-            Divider()
-            Button("Reveal in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([finding.url])
+            if let object = finding.dockerObject {
+                Button("Copy ID") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(object.id, forType: .string)
+                }
+            } else {
+                Button("Exclude folder") {
+                    model.excludeFolder(finding.url.deletingLastPathComponent().path)
+                    showToast()
+                }
+                Button("Copy path") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(finding.url.path, forType: .string)
+                }
+                Divider()
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([finding.url])
+                }
             }
         }
     }
 
     /// ⌘⌫: flip the tick on the highlighted rows, off the first one's state.
+    /// Docker objects only flip one at a time (spec §6).
     private func toggleFocusedRows() {
         let rows = visible.filter { listSelection.contains($0.id) && $0.isReclaimable }
         guard let first = rows.first else { return }
-        model.setSelected(rows.map(\.id), !model.selectedIds.contains(first.id))
+        let ids = rows.count == 1 ? rows.map(\.id) : rows.filter { $0.dockerObject == nil }.map(\.id)
+        model.setSelected(ids, !model.selectedIds.contains(first.id))
     }
 
     /// A checkbox click on a multi-selected row checks/unchecks the whole
-    /// selection.
+    /// selection, except Docker objects, which are confirmed one by one.
     private func toggleRow(_ finding: Finding) {
         let newValue = !model.selectedIds.contains(finding.id)
         if listSelection.contains(finding.id), listSelection.count > 1 {
-            model.setSelected(Array(listSelection), newValue)
+            let dockerIds = Set(visible.filter { $0.dockerObject != nil }.map(\.id))
+            var ids = listSelection.subtracting(dockerIds)
+            if finding.dockerObject != nil { ids = [finding.id] }
+            model.setSelected(Array(ids), newValue)
         } else {
             model.setSelected([finding.id], newValue)
         }
@@ -362,13 +405,13 @@ struct CategoryDetailView: View {
     }
 
     private func quickLook() {
-        let urls = lookupSelection().map(\.url)
+        let urls = lookupSelection().map(\.url).filter(\.isFileURL)
         guard !urls.isEmpty else { return }
         QuickLook.shared.show(urls)
     }
 
     private func revealInFinder() {
-        let urls = lookupSelection().prefix(20).map(\.url)
+        let urls = lookupSelection().map(\.url).filter(\.isFileURL).prefix(20)
         guard !urls.isEmpty else { return }
         NSWorkspace.shared.activateFileViewerSelecting(Array(urls))
     }

@@ -198,14 +198,27 @@ struct ReviewView: View {
     private func itemList(_ group: CleanFlow.CategoryGroup) -> some View {
         LazyVStack(spacing: 0) {
             ForEach(group.items, id: \.originalPath) { item in
+                let docker = DockerObject(storedPath: item.originalPath)
                 HStack(spacing: 8) {
-                    if item.requiresPermanent {
+                    // Items that cannot come back from the Trash keep their
+                    // own tick here: the tick is the per-item confirmation.
+                    if item.requiresPermanent || docker != nil {
                         ItemCheckbox(
-                            checked: !flow.uncheckedNoTrashPaths.contains(item.originalPath)
-                        ) { flow.toggleNoTrashItem(item.originalPath) }
+                            checked: !flow.uncheckedPaths.contains(item.originalPath)
+                        ) { flow.toggleItem(item.originalPath) }
                     }
                     VStack(alignment: .leading, spacing: 1) {
-                        PathText(url: URL(fileURLWithPath: item.originalPath))
+                        if let docker {
+                            Text(docker.displayName)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Text("Removed with docker · cannot be undone")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.orange)
+                        } else {
+                            PathText(url: URL(fileURLWithPath: item.originalPath))
+                        }
                         if group.category == .duplicates,
                            let note = flow.duplicateNote(forPath: item.originalPath) {
                             Text(note)
@@ -233,6 +246,15 @@ struct ReviewView: View {
 
     // MARK: - Footer
 
+    /// Docker objects never reach the Trash, so a Trash run that includes
+    /// them says so next to the Clean button.
+    static func undoNote(disposal: Disposal, dockerItems: Int) -> String {
+        guard disposal == .trash else { return "No undo for permanent delete" }
+        return dockerItems > 0
+            ? "Undo available from History, except Docker items"
+            : "Undo available from History"
+    }
+
     private var footer: some View {
         HStack(spacing: 12) {
             Button("Back") { dismiss() }
@@ -240,9 +262,7 @@ struct ReviewView: View {
             Button("Export list") { flow.exportList() }
                 .buttonStyle(.link)
             Spacer()
-            Text(flow.disposal == .trash
-                 ? "Undo available from History"
-                 : "No undo for permanent delete")
+            Text(Self.undoNote(disposal: flow.disposal, dockerItems: flow.dockerItemCount))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             if flow.disposal == .trash {

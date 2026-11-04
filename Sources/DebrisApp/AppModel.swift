@@ -474,7 +474,8 @@ final class AppModel: ObservableObject {
             scope: debugScope ?? ScanScope(),
             catalogue: catalogue,
             store: store,
-            exclusions: exclusions)
+            exclusions: exclusions,
+            docker: DockerCLI.locate())
         session.start(runner)
         // Category rows update live from the store while the scan writes.
         scanPoll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -538,8 +539,18 @@ final class AppModel: ObservableObject {
 
     func toggleCategory(_ category: Category) {
         let current = (try? store.categoryState(category)) ?? CategoryState.none
-        let next: CategoryState = current == .all ? .none : .all
+        // Docker objects are confirmed one by one (spec §6): a category tick
+        // never sweeps them in, so "everything ticked" is judged without them.
+        let docker = findings.filter { $0.category == category && $0.dockerObject != nil }.map(\.id)
+        let others = findings.filter {
+            $0.category == category && $0.isReclaimable && $0.dockerObject == nil
+        }
+        let othersAllTicked = !others.isEmpty && others.allSatisfy { selectedIds.contains($0.id) }
+        let next: CategoryState = (current == .all || othersAllTicked) ? .none : .all
         try? store.setCategory(category, state: next)
+        if next == .all, !docker.isEmpty {
+            try? store.setSelected(docker, false)
+        }
         refresh()
     }
 
@@ -681,6 +692,12 @@ final class AppModel: ObservableObject {
         guard !items.isEmpty else { return }
         var entries: [(path: String, isFolder: Bool)] = []
         for finding in items {
+            // Docker objects are not files: excluded by their docker:// id.
+            if finding.dockerObject != nil {
+                try? exclusions.addPath(finding.storedPath)
+                entries.append((finding.storedPath, false))
+                continue
+            }
             var isDirectory: ObjCBool = false
             FileManager.default.fileExists(atPath: finding.url.path, isDirectory: &isDirectory)
             if isDirectory.boolValue {

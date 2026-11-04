@@ -200,6 +200,24 @@ struct PathText: View {
     }
 }
 
+/// A journal item's origin: the file path, or the Docker object's name for
+/// items that were never files.
+struct ItemPathText: View {
+    let originalPath: String
+
+    var body: some View {
+        if let object = DockerObject(storedPath: originalPath) {
+            Text(object.displayName)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .help(originalPath)
+        } else {
+            PathText(url: URL(fileURLWithPath: originalPath))
+        }
+    }
+}
+
 // MARK: - AmountButton
 
 /// The only way to build a clean/restore button: the amount is part of the

@@ -160,6 +160,9 @@ struct HistoryView: View {
         case .available, .partiallyAvailable: return ("In Trash", Theme.teal)
         case .unavailable(.trashEmptied): return ("Trash emptied", .gray)
         case .unavailable(.alreadyRestored): return ("Restored", .green)
+        // A Trash run whose only removals were Docker objects: nothing in
+        // the Trash, nothing to restore.
+        case .unavailable(.permanentDelete): return ("Removed, no undo", .red)
         case .unavailable: return ("Nothing moved", .gray)
         }
     }
@@ -170,9 +173,9 @@ struct HistoryView: View {
         LazyVStack(spacing: 0) {
             ForEach(row.items, id: \.id) { item in
                 HStack(spacing: 8) {
-                    PathText(url: URL(fileURLWithPath: item.originalPath))
+                    ItemPathText(originalPath: item.originalPath)
                     Spacer()
-                    Text(itemStatusText(item))
+                    Text(Self.itemStatusText(item))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -193,12 +196,15 @@ struct HistoryView: View {
         .padding(.bottom, 8)
     }
 
-    private func itemStatusText(_ item: ItemRecord) -> String {
+    static func itemStatusText(_ item: ItemRecord) -> String {
         switch item.status {
         case .done: return "In Trash"
         case .restored: return "Restored"
         case .skipped: return DoneView.reasonText(item.skipReason)
-        case .irreversible: return "Deleted permanently"
+        case .irreversible:
+            return DockerObject(storedPath: item.originalPath) != nil
+                ? "Removed with docker · no undo"
+                : "Deleted permanently"
         case .pending: return "Pending"
         }
     }

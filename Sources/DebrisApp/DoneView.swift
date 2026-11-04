@@ -99,11 +99,22 @@ struct DoneView: View {
     // MARK: - Pieces
 
     private var subline: String {
-        let count = Format.count(flow.result?.doneCount ?? 0)
-        let free = Format.bytes(flow.freeNow)
-        return flow.disposal == .trash
-            ? "\(free) free now · \(count) items moved to Trash"
-            : "\(free) free now · \(count) items deleted permanently"
+        Self.subline(freeNow: flow.freeNow, doneCount: flow.result?.doneCount ?? 0,
+                     dockerCount: flow.removedDockerCount, disposal: flow.disposal)
+    }
+
+    /// Docker objects never reach the Trash, so they are counted apart from
+    /// the items that did (S10: "moved to Trash" means exactly that).
+    static func subline(freeNow: Int64, doneCount: Int, dockerCount: Int, disposal: Disposal) -> String {
+        let free = Format.bytes(freeNow)
+        let fileCount = Format.count(max(0, doneCount - dockerCount))
+        var text = disposal == .trash
+            ? "\(free) free now · \(fileCount) items moved to Trash"
+            : "\(free) free now · \(fileCount) items deleted permanently"
+        if dockerCount > 0 {
+            text += " · \(Format.count(dockerCount)) Docker \(dockerCount == 1 ? "object" : "objects") removed"
+        }
+        return text
     }
 
     private struct SkipGroup: Identifiable {
@@ -159,7 +170,7 @@ struct DoneView: View {
                         ForEach(skipGroups) { group in
                             ForEach(group.items, id: \.id) { item in
                                 HStack(spacing: 8) {
-                                    PathText(url: URL(fileURLWithPath: item.originalPath))
+                                    ItemPathText(originalPath: item.originalPath)
                                     Spacer()
                                     Text(group.text)
                                         .font(.system(size: 11))
