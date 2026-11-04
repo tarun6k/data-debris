@@ -33,8 +33,8 @@ The license worker is not deployed. The beta ships the Free tier only; cleaning 
 
 | Suite | Tests |
 |---|---|
-| `DebrisCoreTests` (engine) | 128 (1 skipped) |
-| `DebrisAppTests` (UI/purchase) | 87 |
+| `DebrisCoreTests` (engine) | 150 (1 skipped) |
+| `DebrisAppTests` (UI/purchase) | 92 |
 | `license-worker` (vitest) | 28 |
 
 ## Safety invariants

@@ -6,6 +6,16 @@ repository and a GitHub release.
 
 ## [Unreleased]
 
+### Added
+
+- **Developer junk** now lists Docker dangling images and unused build cache
+  (`dev.docker.dangling`, Review level, never in Auto Clean). Found through
+  `docker system df` over the local socket only, sized as Docker reports them, and
+  removed one object at a time with `docker image rm` / `docker builder prune`; each
+  item is ticked individually. Removed objects are not in the Trash, so History and
+  Done report undo as unavailable for them. Nothing is listed when Docker is not
+  installed, not running, or uses a remote context.
+
 ## [0.9.0-beta.1] - 2026-11-03
 
 First public beta: scan and review only. Cleaning unlocks in 1.0.

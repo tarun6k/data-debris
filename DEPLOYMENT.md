@@ -129,7 +129,7 @@ time.
 
 ### Release checklist
 
-1. `make test` — 128 core + 87 app tests green. This is the gate; the safety invariants
+1. `make test` — 150 core + 92 app tests green. This is the gate; the safety invariants
    S1–S10 are what these tests protect.
 2. Bump the version, and write the "What's new" entries. Any **new catalogue rule must ship
    unticked for Auto Clean** (S9) and be announced in the What's new sheet.
