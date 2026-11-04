@@ -43,7 +43,11 @@ public final class ExclusionStore: @unchecked Sendable {
     }
 
     public func isExcluded(_ url: URL) -> Bool {
-        let path = url.path
+        isExcluded(path: Finding.storedPath(for: url))
+    }
+
+    /// `path` as the stores hold it: a file path, or a docker URL.
+    public func isExcluded(path: String) -> Bool {
         lock.lock(); defer { lock.unlock() }
         if exclusions.paths.contains(path) { return true }
         return exclusions.folders.contains { path == $0 || path.hasPrefix($0 + "/") }

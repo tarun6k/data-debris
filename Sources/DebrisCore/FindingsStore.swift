@@ -146,7 +146,7 @@ public final class FindingsStore: @unchecked Sendable { // DatabasePool is threa
                         mtime = excluded.mtime, lastOpened = excluded.lastOpened,
                         reclaimable = excluded.reclaimable
                     """, arguments: [
-                        scanId, finding.id, finding.ruleId, finding.url.path,
+                        scanId, finding.id, finding.ruleId, finding.storedPath,
                         finding.size, finding.allocatedSize, finding.mtime, finding.lastOpened,
                         finding.level.rawValue, finding.category.rawValue,
                         finding.reason, finding.consequence, finding.ownerBundleId,
@@ -172,7 +172,7 @@ public final class FindingsStore: @unchecked Sendable { // DatabasePool is threa
                           let category = Category(rawValue: row["category"]) else { return nil }
                     return Finding(
                         ruleId: row["ruleId"],
-                        url: URL(fileURLWithPath: row["path"]),
+                        url: Finding.url(forStoredPath: row["path"]),
                         size: row["size"],
                         allocatedSize: row["allocatedSize"],
                         mtime: row["mtime"],

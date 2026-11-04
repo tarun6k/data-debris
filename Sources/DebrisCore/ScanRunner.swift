@@ -36,6 +36,7 @@ public final class ScanRunner: @unchecked Sendable {
     private let exclusions: ExclusionStore?
     private let protectedPaths: ProtectedPaths
     private let home: URL
+    private let docker: DockerCLI?
 
     private let skipLock = NSLock()
     private var skipDup = false
@@ -56,7 +57,8 @@ public final class ScanRunner: @unchecked Sendable {
         store: FindingsStore,
         exclusions: ExclusionStore? = nil,
         protectedPaths: ProtectedPaths = ProtectedPaths(),
-        home: URL = FileManager.default.homeDirectoryForCurrentUser
+        home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        docker: DockerCLI? = nil
     ) {
         self.scope = scope
         self.catalogue = catalogue
@@ -64,6 +66,7 @@ public final class ScanRunner: @unchecked Sendable {
         self.exclusions = exclusions
         self.protectedPaths = protectedPaths
         self.home = home.standardizedFileURL
+        self.docker = docker
     }
 
     public func run(
@@ -136,6 +139,14 @@ public final class ScanRunner: @unchecked Sendable {
             // Open directory aggregation is dropped: its size would be
             // incomplete, and under-reporting is the safe direction.
             cancelled = true
+        }
+
+        // Docker objects are not files: asked once, after the walk, and only
+        // when the catalogue carries the rule — Auto Clean's cut-down
+        // catalogue never does (S2), and no docker means no findings.
+        if !cancelled, let rule = catalogue.rules.first(where: { $0.id == DockerAnalyzer.ruleId }) {
+            let found = await DockerAnalyzer(rule: rule, cli: docker).findings(now: now)
+            take(found.filter { !(exclusions?.isExcluded(path: $0.storedPath) ?? false) })
         }
 
         // Hashing runs last (§Screen 2): the walk is done, so throttled I/O

@@ -47,6 +47,7 @@ public enum SkipReason: Equatable, Sendable {
     case changed, vanished, protected, noTrash, cancelled, trashEmptied
     case inUse(String)      // process name
     case moveFailed(String) // unexpected error text
+    case dockerFailed(String) // docker's own refusal or "not installed"
 
     var stored: String {
         switch self {
@@ -58,6 +59,7 @@ public enum SkipReason: Equatable, Sendable {
         case .trashEmptied: return "trashEmptied"
         case .inUse(let name): return "inUse:\(name)"
         case .moveFailed(let text): return "moveFailed:\(text)"
+        case .dockerFailed(let text): return "dockerFailed:\(text)"
         }
     }
 
@@ -72,6 +74,7 @@ public enum SkipReason: Equatable, Sendable {
         default:
             if stored.hasPrefix("inUse:") { self = .inUse(String(stored.dropFirst(6))) }
             else if stored.hasPrefix("moveFailed:") { self = .moveFailed(String(stored.dropFirst(11))) }
+            else if stored.hasPrefix("dockerFailed:") { self = .dockerFailed(String(stored.dropFirst(13))) }
             else { return nil }
         }
     }

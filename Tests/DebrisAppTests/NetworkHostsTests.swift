@@ -57,6 +57,7 @@ final class NetworkHostsTests: XCTestCase {
             // Subprocesses are listed so a `curl` could not hide in one.
             "DebrisCore/AutoClean/LaunchAgentManager.swift": "Process: /bin/launchctl",
             "DebrisCore/AutoClean/AutoCleanRunner.swift": "Process: /usr/bin/tmutil status",
+            "DebrisCore/DockerCLI.swift": "Process: docker CLI over its local socket (context inspect, system df, image rm, builder prune)",
         ]
         let markers = ["URLSession", "NSURLConnection", "NWConnection", "NWListener", "NWPathMonitor",
                        "import Network", "import Sparkle", "CFStream", "WKWebView", "getaddrinfo",

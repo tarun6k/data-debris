@@ -3,7 +3,8 @@ import Foundation
 
 /// One removable (or explained) item produced by an analyzer.
 public struct Finding: Equatable, Sendable, Identifiable {
-    /// Stable across scans: SHA-256 of rule id + path.
+    /// Stable across scans: SHA-256 of rule id + stored path (file path, or
+    /// the docker URL for objects that are not files).
     public let id: String
     public let ruleId: String
     public let url: URL
@@ -33,7 +34,7 @@ public struct Finding: Equatable, Sendable, Identifiable {
         ownerBundleId: String? = nil,
         isReclaimable: Bool = true
     ) {
-        self.id = Finding.stableID(ruleId: ruleId, path: url.path)
+        self.id = Finding.stableID(ruleId: ruleId, path: Finding.storedPath(for: url))
         self.ruleId = ruleId
         self.url = url
         self.size = size

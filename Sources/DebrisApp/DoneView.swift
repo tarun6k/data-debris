@@ -128,6 +128,7 @@ struct DoneView: View {
         case .protected: return "Protected location"
         case .trashEmptied: return "Trash was emptied"
         case .moveFailed(let text): return "Could not move: \(text)"
+        case .dockerFailed(let text): return "Docker: \(text)"
         case nil: return "Skipped"
         }
     }

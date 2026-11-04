@@ -49,6 +49,9 @@ public final class Executor: @unchecked Sendable {
     private let protectedPaths: ProtectedPaths
     private let exclusions: ExclusionStore?
     private let volumeToMeasure: URL
+    private let docker: DockerCLI?
+    private let dockerLock = NSLock()
+    private var dockerEndpointIsLocal: Bool?
 
     /// Test hook: runs after the journal is durable, before any move. A throw
     /// aborts execute with the run still pending — the crash-window shape.
@@ -58,12 +61,14 @@ public final class Executor: @unchecked Sendable {
         history: HistoryStore,
         protectedPaths: ProtectedPaths = ProtectedPaths(),
         exclusions: ExclusionStore? = nil,
-        volumeToMeasure: URL = FileManager.default.homeDirectoryForCurrentUser
+        volumeToMeasure: URL = FileManager.default.homeDirectoryForCurrentUser,
+        docker: DockerCLI? = DockerCLI.locate()
     ) {
         self.history = history
         self.protectedPaths = protectedPaths
         self.exclusions = exclusions
         self.volumeToMeasure = volumeToMeasure
+        self.docker = docker
     }
 
     // MARK: - Execute
@@ -157,6 +162,14 @@ public final class Executor: @unchecked Sendable {
     private func processItem(
         _ item: ItemRecord, plan: CleanPlan, requiresPermanent: Set<String>
     ) -> Outcome {
+        // Docker objects are not files: no stat, no Trash. Docker itself
+        // refuses an image that gained a tag or container since the scan
+        // (S6), and the removal cannot be undone, so it is journaled as
+        // irreversible — the same shape as permanent delete.
+        if let object = DockerObject(storedPath: item.originalPath) {
+            if exclusions?.isExcluded(path: item.originalPath) ?? false { return .skip(.protected) }
+            return removeDockerObject(object, allocated: item.allocatedSize)
+        }
         let url = URL(fileURLWithPath: item.originalPath)
 
         // (a) Re-stat: gone or changed since the scan → hands off (S6).
@@ -209,6 +222,45 @@ public final class Executor: @unchecked Sendable {
         } catch {
             return .skip(.moveFailed(error.localizedDescription))
         }
+    }
+
+    /// `docker image rm <id>` or `docker builder prune --filter id=<id>`,
+    /// never a blanket prune. Each refusal becomes a skip the user can read.
+    private func removeDockerObject(_ object: DockerObject, allocated: Int64) -> Outcome {
+        guard let docker else { return .skip(.dockerFailed("docker is not installed")) }
+        guard dockerIsLocal(docker) else {
+            return .skip(.dockerFailed("docker context is not a local socket"))
+        }
+        do {
+            let output = try docker.run(object.removalArguments, timeout: 60)
+            if case .buildCache(let id) = object {
+                // builder prune exits 0 whether or not anything matched; what
+                // it removed is listed on stdout (full ids, our id a prefix).
+                guard String(decoding: output, as: UTF8.self).contains(id) else {
+                    return .skip(.dockerFailed("not removed: in use or already gone"))
+                }
+            }
+            return Outcome(status: .irreversible, movedAt: Date(), movedAllocated: allocated)
+        } catch DockerCLI.Failure.timedOut {
+            return .skip(.dockerFailed("docker did not respond"))
+        } catch DockerCLI.Failure.notInstalled {
+            return .skip(.dockerFailed("docker is not installed"))
+        } catch DockerCLI.Failure.failed(_, let stderr) {
+            if stderr.localizedCaseInsensitiveContains("no such image") { return .skip(.vanished) }
+            return .skip(.dockerFailed(stderr.isEmpty ? "docker failed" : stderr))
+        } catch {
+            return .skip(.dockerFailed(error.localizedDescription))
+        }
+    }
+
+    /// Checked once per run: a context pointing at a remote host is never
+    /// used (the Privacy & Security sheet names every host the app contacts).
+    private func dockerIsLocal(_ docker: DockerCLI) -> Bool {
+        dockerLock.lock(); defer { dockerLock.unlock() }
+        if let known = dockerEndpointIsLocal { return known }
+        let local = docker.endpointIsLocalSocket()
+        dockerEndpointIsLocal = local
+        return local
     }
 
     /// Name of a process holding the path open, or nil if none.

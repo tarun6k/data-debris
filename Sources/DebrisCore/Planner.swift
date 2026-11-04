@@ -115,6 +115,23 @@ public struct Planner {
     }
 
     private func makeItem(_ finding: Finding) -> PlanItem? {
+        if let object = finding.dockerObject {
+            // Not a file: nothing to stat, no volume, no Trash. The daemon
+            // re-checks the object at removal time (S6) and the removal is
+            // journaled as irreversible, like permanent delete.
+            return PlanItem(
+                originalPath: object.storedPath,
+                size: finding.size,
+                allocatedSize: finding.allocatedSize,
+                mtime: finding.mtime.timeIntervalSince1970,
+                inode: 0,
+                volumeUUID: DockerObject.scheme,
+                hash: nil,
+                ruleId: finding.ruleId,
+                ownerBundleId: finding.ownerBundleId,
+                isDirectory: false,
+                requiresPermanent: false)
+        }
         var st = stat()
         guard lstat(finding.url.path, &st) == 0 else { return nil }
         let values = try? finding.url.resourceValues(forKeys: [.volumeUUIDStringKey, .volumeURLKey])
