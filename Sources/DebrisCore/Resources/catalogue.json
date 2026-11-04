@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "rules": [
     {
       "id": "appcaches.browser.safari",
@@ -290,6 +290,18 @@
       "owner": null,
       "reason": "Items already in the Trash.",
       "consequence": "Emptying the Trash cannot be undone.",
+      "autoCleanEligible": false
+    },
+    {
+      "id": "dev.docker.dangling",
+      "category": "developer",
+      "level": "review",
+      "match": [],
+      "unit": "file",
+      "predicates": [{ "sizeAtLeastBytes": 1 }],
+      "owner": null,
+      "reason": "Untagged images and build cache Docker no longer uses.",
+      "consequence": "Images re-pulled on next run.",
       "autoCleanEligible": false
     },
     {

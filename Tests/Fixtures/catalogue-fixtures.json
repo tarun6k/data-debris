@@ -202,6 +202,44 @@
       ]
     },
     {
+      "ruleID": "dev.docker.dangling",
+      "analyzerOnly": true,
+      "dockerSystemDF": {
+        "Images": [
+          { "ID": "3f2a1b9c0d4e", "Repository": "<none>", "Tag": "<none>", "Digest": "<none>", "CreatedAt": "2026-05-01 10:00:00 +0000 UTC", "CreatedSince": "6 months ago", "Size": "1.23GB", "SharedSize": "0B", "UniqueSize": "1.23GB", "VirtualSize": "1.23GB", "Containers": "0" },
+          { "ID": "9b8c7d6e5f4a", "Repository": "<none>", "Tag": "<none>", "Digest": "<none>", "CreatedAt": "2026-08-12 09:15:30 +0000 UTC", "CreatedSince": "3 months ago", "Size": "845MB", "SharedSize": "412MB", "UniqueSize": "433MB", "VirtualSize": "845MB", "Containers": "0" },
+          { "ID": "a1b2c3d4e5f6", "Repository": "nginx", "Tag": "1.27", "Digest": "sha256:4a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9", "CreatedAt": "2026-09-01 00:00:00 +0000 UTC", "CreatedSince": "2 months ago", "Size": "192MB", "SharedSize": "0B", "UniqueSize": "192MB", "VirtualSize": "192MB", "Containers": "1" },
+          { "ID": "c0ffee123456", "Repository": "<none>", "Tag": "<none>", "Digest": "<none>", "CreatedAt": "2026-07-20 12:00:00 +0000 UTC", "CreatedSince": "3 months ago", "Size": "310MB", "SharedSize": "0B", "UniqueSize": "310MB", "VirtualSize": "310MB", "Containers": "1" },
+          { "ID": "deadbeef0001", "Repository": "postgres", "Tag": "16", "Digest": "sha256:deadbeef0001deadbeef0001deadbeef0001deadbeef0001deadbeef0001dead", "CreatedAt": "2026-06-10 08:00:00 +0000 UTC", "CreatedSince": "4 months ago", "Size": "431MB", "SharedSize": "0B", "UniqueSize": "431MB", "VirtualSize": "431MB", "Containers": "0" }
+        ],
+        "Containers": [
+          { "ID": "7a7a7a7a7a7a", "Image": "nginx:1.27", "Command": "\"/docker-entrypoint.sh nginx -g 'daemon off;'\"", "LocalVolumes": "0", "Size": "1.2kB", "CreatedAt": "2026-10-30 08:00:00 +0000 UTC", "RunningFor": "5 days ago", "Status": "Exited (0) 2 days ago", "Names": "web" }
+        ],
+        "Volumes": [
+          { "Name": "pgdata", "Links": "0", "Size": "58.3MB" }
+        ],
+        "BuildCache": [
+          { "ID": "k2l3m4n5o6p7", "Parent": "", "CacheType": "regular", "Description": "mount / from exec /bin/sh -c npm ci", "Size": "456MB", "CreatedAt": "2026-08-01 14:02:11 +0000 UTC", "CreatedSince": "3 months ago", "LastUsedAt": "2026-09-15 08:30:00 +0000 UTC", "LastUsedSince": "7 weeks ago", "UsageCount": "3", "InUse": "false", "Shared": "false" },
+          { "ID": "q8r9s0t1u2v3", "Parent": "", "CacheType": "regular", "Description": "pulled from docker.io/library/node:20", "Size": "120MB", "CreatedAt": "2026-10-30 10:00:00 +0000 UTC", "CreatedSince": "5 days ago", "LastUsedAt": "2026-11-04 09:00:00 +0000 UTC", "LastUsedSince": "2 hours ago", "UsageCount": "12", "InUse": "true", "Shared": "false" },
+          { "ID": "w4x5y6z7a8b9", "Parent": "k2l3m4n5o6p7", "CacheType": "regular", "Description": "[2/4] COPY package.json .", "Size": "77.5MB", "CreatedAt": "2026-08-01 14:02:40 +0000 UTC", "CreatedSince": "3 months ago", "LastUsedAt": "2026-09-15 08:30:10 +0000 UTC", "LastUsedSince": "7 weeks ago", "UsageCount": "3", "InUse": "false", "Shared": "true" },
+          { "ID": "s0urce000001", "Parent": "", "CacheType": "source.local", "Description": "local source for context", "Size": "3.2kB", "CreatedAt": "2026-10-01 11:11:11 +0000 UTC", "CreatedSince": "5 weeks ago", "LastUsedAt": "2026-10-01 11:11:11 +0000 UTC", "LastUsedSince": "5 weeks ago", "UsageCount": "1", "InUse": "false", "Shared": "false" }
+        ]
+      },
+      "positive": [
+        { "path": "docker://image/3f2a1b9c0d4e", "sizeBytes": 1230000000 },
+        { "path": "docker://image/9b8c7d6e5f4a", "sizeBytes": 433000000 },
+        { "path": "docker://build-cache/k2l3m4n5o6p7", "sizeBytes": 456000000 },
+        { "path": "docker://build-cache/s0urce000001", "sizeBytes": 3200 }
+      ],
+      "negative": [
+        { "path": "docker://image/a1b2c3d4e5f6" },
+        { "path": "docker://image/c0ffee123456" },
+        { "path": "docker://image/deadbeef0001" },
+        { "path": "docker://build-cache/q8r9s0t1u2v3" },
+        { "path": "docker://build-cache/w4x5y6z7a8b9" }
+      ]
+    },
+    {
       "ruleID": "duplicates.identical",
       "analyzerOnly": true,
       "positive": [

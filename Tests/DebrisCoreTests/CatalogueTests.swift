@@ -10,7 +10,7 @@ final class CatalogueTests: XCTestCase {
     func testBundledCatalogueLoads() throws {
         let catalogue = try bundled()
         XCTAssertGreaterThanOrEqual(catalogue.version, 1)
-        XCTAssertEqual(catalogue.rules.count, 23)
+        XCTAssertEqual(catalogue.rules.count, 24)
     }
 
     func testRuleIDsAreUnique() throws {
