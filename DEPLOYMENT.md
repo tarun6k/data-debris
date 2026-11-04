@@ -6,11 +6,13 @@ How Data Debris gets from this repo to a user's Mac. Two independently deployed 
 2. **The license service** — a Cloudflare Worker that turns Paddle webhooks into
    Ed25519-signed licenses.
 
-> **Status.** The app is not yet signed, notarized or shipping updates — that is Phase 8,
-> and the sections marked *(Phase 8 — not yet implemented)* describe the intended process
-> rather than scripts that exist today. The license worker is implemented and tested, but
-> has never been deployed: both `wrangler.toml` environments still carry
-> `TODO-wrangler-kv-namespace-create` KV ids.
+> **Status.** The release scripts exist and run: `scripts/release.sh` chains
+> `build-release.sh`, `notarize.sh`, `make-dmg.sh` and `sign-appcast.sh`, each of which
+> warns and carries on when its identity is missing. With no Developer ID yet, the 0.9
+> beta is ad-hoc signed and not notarized. Sparkle 2.9.6 is linked, but the updater stays
+> off until `SUPublicEDKey` in `project.yml` is replaced with a real key. The license worker
+> is implemented and tested, but has never been deployed: both `wrangler.toml` environments
+> still carry `TODO-wrangler-kv-namespace-create` KV ids.
 
 ---
 
@@ -81,7 +83,7 @@ Non-secret vars (`PADDLE_ENV`, `EMAIL_FROM`) live in `wrangler.toml`.
 **4. Deploy:**
 
 ```sh
-npm test                          # 24 tests, must be green
+npm test                          # 28 tests, must be green
 npm run typecheck
 npx wrangler deploy --env sandbox
 curl https://<worker-host>/healthz    # expects {"ok":true}
@@ -112,7 +114,7 @@ already issued — the key layout is documented at the top of `src/store.ts`.
 
 ---
 
-## Part 2 — The app *(Phase 8 — not yet implemented)*
+## Part 2 — The app *(scripted; ad-hoc signed until a Developer ID exists)*
 
 ### Prerequisites
 
@@ -127,7 +129,7 @@ time.
 
 ### Release checklist
 
-1. `make test` — 116 core + 45 app tests green. This is the gate; the safety invariants
+1. `make test` — 128 core + 87 app tests green. This is the gate; the safety invariants
    S1–S10 are what these tests protect.
 2. Bump the version, and write the "What's new" entries. Any **new catalogue rule must ship
    unticked for Auto Clean** (S9) and be announced in the What's new sheet.
@@ -135,8 +137,13 @@ time.
 4. Inject release config (`LICENSE_WORKER_URL`, `PADDLE_CLIENT_TOKEN`, `PADDLE_ENV`,
    the four `PADDLE_PRICE_*`) as Info.plist keys at archive time — release builds read
    Info.plist, Debug builds read `.env`. Point `PADDLE_ENV` at `production`.
-5. Archive a **universal** binary (arm64 + x86_64), Hardened Runtime on, App Sandbox off.
-6. Sign, notarize, staple:
+5. `scripts/build-release.sh` archives a **universal** binary (arm64 + x86_64), Hardened
+   Runtime on, App Sandbox off, and signs it with `DEVELOPER_ID_APP` / `DEVELOPMENT_TEAM`
+   from the environment. Without them it re-signs ad hoc with a loud warning, which is how
+   the 0.9 beta was built. `scripts/release.sh` runs steps 5–8 in order.
+6. `scripts/notarize.sh` notarizes and staples the app (and later the DMG) through a
+   `notarytool` keychain profile named in `NOTARY_PROFILE`; it skips with a warning when
+   that is unset. By hand:
 
    ```sh
    xcrun notarytool submit DataDebris.dmg --keychain-profile "<profile>" --wait
@@ -144,8 +151,10 @@ time.
    spctl -a -vvv -t install DataDebris.app    # expect "accepted / Developer ID"
    ```
 
-7. Build the DMG with a "drag to Applications" layout.
-8. Sign the appcast with the Sparkle EdDSA key and publish it to
+7. `scripts/make-dmg.sh` builds the DMG with a "drag to Applications" layout and a
+   `.sha256` next to it.
+8. `scripts/sign-appcast.sh` signs the appcast with the Sparkle EdDSA key at
+   `SPARKLE_PRIVATE_KEY_FILE` (skipped with a warning when unset); publish it to
    `updates.datadebris.app` — this host is hard-coded as `LicenseConfig.updateHost` because
    the Privacy & Security sheet promises it is one of only two hosts the app ever contacts.
    Changing it would break that promise and its text hash.

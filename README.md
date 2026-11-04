@@ -25,14 +25,17 @@ It is **not** a speed booster, antivirus, uninstaller or RAM cleaner, and it nev
 ## Status
 
 **0.9 beta: scan and review only.** The engine, UI and licensing service are implemented
-and tested. The beta build is ad-hoc signed (no Developer ID yet), has no in-app updates,
-and ships the Free tier only; cleaning unlocks in 1.0. See [CHANGELOG.md](CHANGELOG.md).
+and tested. The release scripts in `scripts/` (archive, notarize, DMG, appcast) exist and
+run, but with no Developer ID yet the beta build is ad-hoc signed and not notarized. Sparkle
+2.9.6 is linked, and the updater stays off until `SUPublicEDKey` in `project.yml` is set.
+The license worker is not deployed. The beta ships the Free tier only; cleaning unlocks in
+1.0. See [CHANGELOG.md](CHANGELOG.md).
 
 | Suite | Tests |
 |---|---|
-| `DebrisCoreTests` (engine) | 116 |
-| `DebrisAppTests` (UI/purchase) | 45 |
-| `license-worker` (vitest) | 24 |
+| `DebrisCoreTests` (engine) | 128 (1 skipped) |
+| `DebrisAppTests` (UI/purchase) | 87 |
+| `license-worker` (vitest) | 28 |
 
 ## Safety invariants
 

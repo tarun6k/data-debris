@@ -4,6 +4,8 @@ Notable changes to Data Debris. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); each version is a tag on this
 repository and a GitHub release.
 
+## [Unreleased]
+
 ## [0.9.0-beta.1] - 2026-11-03
 
 First public beta: scan and review only. Cleaning unlocks in 1.0.
@@ -20,7 +22,7 @@ First public beta: scan and review only. Cleaning unlocks in 1.0.
   - **Logs & crash reports** — `~/Library/Logs` and DiagnosticReports older than 7 days.
   - **Developer junk** — Xcode DerivedData, device support and archives, simulator
     runtimes, package caches (npm, yarn, pip, Gradle, Cargo, CocoaPods, SwiftPM, Homebrew),
-    gitignored build folders inside projects, Docker build cache.
+    gitignored build folders inside projects.
   - **Duplicates** — byte-identical files from 1 MB, hash-verified, one kept copy always.
   - **Large & old** — files of 500 MB or more not opened for 180 days, for your judgement.
   - **Trash** — what Empty Trash would free, done by Finder itself.
@@ -67,4 +69,5 @@ Each one has a test in `DebrisCoreTests` / `DebrisAppTests`; full text in `CLAUD
   says that cleaning unlocks in version 1.0. The license service is not deployed, so
   "Already have a license?" cannot activate a key yet.
 
+[Unreleased]: https://github.com/tarun6k/data-debris/compare/v0.9.0-beta.1...HEAD
 [0.9.0-beta.1]: https://github.com/tarun6k/data-debris/releases/tag/v0.9.0-beta.1
