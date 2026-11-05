@@ -24,17 +24,18 @@ It is **not** a speed booster, antivirus, uninstaller or RAM cleaner, and it nev
 
 ## Status
 
-**0.9 beta: scan and review only.** The engine, UI and licensing service are implemented
-and tested. The release scripts in `scripts/` (archive, notarize, DMG, appcast) exist and
-run, but with no Developer ID yet the beta build is ad-hoc signed and not notarized. Sparkle
+**0.9 beta: free edition.** The engine, UI and licensing service are implemented and
+tested. The release scripts in `scripts/` (archive, notarize, DMG, appcast) exist and run,
+but with no Developer ID yet the beta build is ad-hoc signed and not notarized. Sparkle
 2.9.6 is linked, and the updater stays off until `SUPublicEDKey` in `project.yml` is set.
-The license worker is not deployed. The beta ships the Free tier only; cleaning unlocks in
-1.0. See [CHANGELOG.md](CHANGELOG.md).
+The beta ships with `PurchasesEnabled` off: every feature is unlocked, there is no purchase
+flow, and the license worker (not deployed) is never contacted. See
+[CHANGELOG.md](CHANGELOG.md).
 
 | Suite | Tests |
 |---|---|
 | `DebrisCoreTests` (engine) | 150 (1 skipped) |
-| `DebrisAppTests` (UI/purchase) | 92 |
+| `DebrisAppTests` (UI/purchase) | 98 |
 | `license-worker` (vitest) | 28 |
 
 ## Safety invariants
@@ -98,8 +99,8 @@ with the Developer ID build in 1.0.
    protected parts of `~/Library` stay hidden and the rest of your home folder is still
    scanned (**Continue with limited access**).
 7. **Start scanning.** The Results screen lists each category with its size and the reason
-   a rule claimed it. In the beta that is where it stops: cleaning unlocks in 1.0, and the
-   plan sheet says so.
+   a rule claimed it. Tick what you want gone and open Review; nothing is removed until you
+   confirm there, and everything goes to the Trash.
 
 **Updating.** The beta has no in-app updates: download the next DMG and replace the app in
 Applications. Your exclusions and history stay in `~/Library/Application Support`.
@@ -166,19 +167,15 @@ Engine code is written before UI, and gets tests before UI.
 
 When this file and the spec disagree, **the spec wins**.
 
-## Pricing
+## Free during the beta
 
-Free forever: unlimited scans and full results with reasons, exclusions, History viewer.
-
-| Plan | Price | Includes |
-|---|---|---|
-| **1 Year** | $20 | Cleaning, Undo, Duplicates, Auto Clean, updates for the term. 2 Macs. |
-| **3 Years** | $50 | Same, 3-year term. 2 Macs. |
-
-Auto-renew is **off by default**. When a term lapses the app returns to Free — scanning and
-results keep working, cleaning locks, and History and Undo of past runs remain available.
-Payment is through Paddle as merchant of record; the app never sees card details. Before any
-price is shown, the Privacy & Security sheet must be acknowledged.
+The beta is free: scanning, Clean, Undo, Duplicates and Auto Clean all work with no
+purchase and no license. A paid plan is planned for 1.0 (1 Year $20, 3 Years $50, each
+covering 2 Macs, with unlimited scans staying free) and is switched off in the beta by
+`PurchasesEnabled` in `Sources/DebrisApp/Resources/AppConfig.plist`; the licensing code
+and its tests stay in the tree for that release. The engine's safety rules do not depend on
+the edition: the Review gate, Trash by default, the journal before every move and the
+Auto Clean eligibility rules apply exactly as before.
 
 ## Privacy
 

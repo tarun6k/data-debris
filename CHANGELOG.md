@@ -16,6 +16,13 @@ repository and a GitHub release.
   Done report undo as unavailable for them. Nothing is listed when Docker is not
   installed, not running, or uses a remote context.
 
+### Changed
+
+- **Free edition.** `PurchasesEnabled` in AppConfig.plist is off: Clean, Undo, Duplicates
+  and Auto Clean work for everyone, no plan or Privacy & Security sheet is shown, Settings
+  says "Free during the beta", and the license service is never created or contacted. The
+  licensing code and its tests stay in the tree for 1.0.
+
 ## [0.9.0-beta.1] - 2026-11-03
 
 First public beta: scan and review only. Cleaning unlocks in 1.0.

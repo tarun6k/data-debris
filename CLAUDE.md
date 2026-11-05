@@ -39,6 +39,9 @@ VCS working trees (.git/.hg/.svn) except .gitignore'd build dirs,
 Time Machine and APFS snapshots, open/mmapped files, dot-files in the home root.
 
 ## Monetisation rules
+PurchasesEnabled=false in Sources/DebrisApp/Resources/AppConfig.plist ships the free edition
+(everything unlocked, no purchase flow, no license service contact); the rules below apply
+when it is true.
 Free: unlimited scans and full results. Paid: 1 Year $20, 3 Years $50, 2 Macs each.
 Before any price is shown, the Privacy & Security sheet must be acknowledged (scrolled to
 end + unticked checkbox ticked). Auto-renew is OFF by default. Lapsed = back to Free;

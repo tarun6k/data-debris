@@ -12,7 +12,9 @@ How Data Debris gets from this repo to a user's Mac. Two independently deployed 
 > beta is ad-hoc signed and not notarized. Sparkle 2.9.6 is linked, but the updater stays
 > off until `SUPublicEDKey` in `project.yml` is replaced with a real key. The license worker
 > is implemented and tested, but has never been deployed: both `wrangler.toml` environments
-> still carry `TODO-wrangler-kv-namespace-create` KV ids.
+> still carry `TODO-wrangler-kv-namespace-create` KV ids. It is not needed for a
+> free-edition release (`PurchasesEnabled` off in `AppConfig.plist`, as the beta ships):
+> such a build never contacts it, so Part 1 and checklist step 4 can be skipped.
 
 ---
 
@@ -41,6 +43,10 @@ key in an app update before switching the worker over.
 ---
 
 ## Part 1 — The license service
+
+Not needed for free-edition releases: with `PurchasesEnabled` off the app creates no license
+client and makes no request to this service. Deploy it before the first build that turns
+purchases on.
 
 ### First deploy, per environment
 
@@ -129,7 +135,7 @@ time.
 
 ### Release checklist
 
-1. `make test` — 150 core + 92 app tests green. This is the gate; the safety invariants
+1. `make test` — 150 core + 98 app tests green. This is the gate; the safety invariants
    S1–S10 are what these tests protect.
 2. Bump the version, and write the "What's new" entries. Any **new catalogue rule must ship
    unticked for Auto Clean** (S9) and be announced in the What's new sheet.

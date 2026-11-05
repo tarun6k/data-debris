@@ -244,6 +244,8 @@ Group by size*→*Drop singletons*→*Hash first 64 KB*→*Drop singletons*→*F
 
 ### Pricing & licensing
 
+Pre-1.0 beta builds ship as the free edition (`PurchasesEnabled=false` in `AppConfig.plist`): every feature is unlocked, there is no purchase flow, and the license service is never contacted. The pricing and gating below apply when `PurchasesEnabled` is true.
+
 | Plan | Price | Per month | Includes |
 |---|---|---|---|
 | **Free** | \$0 | — | Unlimited scans, full results with reasons, exclusions, History viewer. No cleaning. |
