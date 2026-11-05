@@ -28,6 +28,7 @@ struct SettingsView: View {
             helpSection
             AboutSection(
                 config: AppConfig.current,
+                edition: model.edition,
                 onPrivacySheet: { showingPrivacySheet = true },
                 onProtections: { showingProtections = true },
                 onAcknowledgements: { showingAcknowledgements = true },
@@ -61,45 +62,74 @@ struct SettingsView: View {
 
     // MARK: - License
 
+    /// Which License section Settings renders. Pure, so tests can pin that
+    /// the free edition shows no plan, key or subscription UI at all.
+    enum LicenseSectionKind: Equatable {
+        case freeEdition, activeLicense, plans
+    }
+
+    static func licenseSectionKind(edition: Edition, licensed: Bool) -> LicenseSectionKind {
+        switch (edition, licensed) {
+        case (.free, _): return .freeEdition
+        case (.licensed, true): return .activeLicense
+        case (.licensed, false): return .plans
+        }
+    }
+
+    static let freeEditionLine = "Free during the beta"
+
     @ViewBuilder
     private var licenseSection: some View {
-        if let payload = model.licensePayload {
+        switch Self.licenseSectionKind(edition: model.edition, licensed: model.licensePayload != nil) {
+        case .freeEdition:
             Section("License") {
-                row("Plan", payload.plan.displayName)
-                row(payload.expiryDate > Date() ? "Expires" : "Expired",
-                    payload.expiryDate.formatted(date: .long, time: .omitted))
-                row("Auto-renew", payload.autoRenew ? "On" : "Off")
-                machines(payload)
-                HStack(spacing: 10) {
-                    Button("Deactivate this Mac") { confirmingDeactivate = true }
-                    Button("Manage subscription") { open(AppConfig.current.customerPortalURL) }
-                    Button("Request refund") { open(AppConfig.current.customerPortalURL) }
-                }
-                HStack(spacing: 10) {
-                    Button("Enter a different key") { showingLicenseEntry = true }
-                    Button("Recover my key by email") { showingLicenseEntry = true }
-                }
-                debugResetRow
+                Text(Self.freeEditionLine)
             }
-        } else {
-            Section("License") {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Free plan").font(.system(size: 13, weight: .semibold))
-                    planLine("Free — $0 forever",
-                             "unlimited scans · full results with reasons · History and Undo")
-                    planLine("1 Year — $20 (\(PlanPricing.perMonth(.oneYear)))",
-                             "Clean · Undo · Duplicates · Auto Clean · 2 Macs")
-                    planLine("3 Years — $50 (\(PlanPricing.perMonth(.threeYears)))",
-                             "everything in 1 Year · \(PlanPricing.saveLabel)")
-                }
-                HStack(spacing: 10) {
-                    Button("Choose a plan") { model.startPurchase() }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.teal)
-                    Button("Already have a license?") { showingLicenseEntry = true }
-                }
-                debugResetRow
+        case .activeLicense:
+            if let payload = model.licensePayload { activeLicenseSection(payload) }
+        case .plans:
+            plansSection
+        }
+    }
+
+    private func activeLicenseSection(_ payload: EntitlementPayload) -> some View {
+        Section("License") {
+            row("Plan", payload.plan.displayName)
+            row(payload.expiryDate > Date() ? "Expires" : "Expired",
+                payload.expiryDate.formatted(date: .long, time: .omitted))
+            row("Auto-renew", payload.autoRenew ? "On" : "Off")
+            machines(payload)
+            HStack(spacing: 10) {
+                Button("Deactivate this Mac") { confirmingDeactivate = true }
+                Button("Manage subscription") { open(AppConfig.current.customerPortalURL) }
+                Button("Request refund") { open(AppConfig.current.customerPortalURL) }
             }
+            HStack(spacing: 10) {
+                Button("Enter a different key") { showingLicenseEntry = true }
+                Button("Recover my key by email") { showingLicenseEntry = true }
+            }
+            debugResetRow
+        }
+    }
+
+    private var plansSection: some View {
+        Section("License") {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Free plan").font(.system(size: 13, weight: .semibold))
+                planLine("Free — $0 forever",
+                         "unlimited scans · full results with reasons · History and Undo")
+                planLine("1 Year — $20 (\(PlanPricing.perMonth(.oneYear)))",
+                         "Clean · Undo · Duplicates · Auto Clean · 2 Macs")
+                planLine("3 Years — $50 (\(PlanPricing.perMonth(.threeYears)))",
+                         "everything in 1 Year · \(PlanPricing.saveLabel)")
+            }
+            HStack(spacing: 10) {
+                Button("Choose a plan") { model.startPurchase() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.teal)
+                Button("Already have a license?") { showingLicenseEntry = true }
+            }
+            debugResetRow
         }
     }
 

@@ -31,7 +31,7 @@ struct AutoCleanView: View {
 
     var body: some View {
         Form {
-            if !model.entitlementState.isEntitled {
+            if !model.isEntitled {
                 Section {
                     HStack(spacing: 10) {
                         Image(systemName: "lock")

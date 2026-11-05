@@ -38,11 +38,14 @@ struct Acknowledgement: Identifiable {
     }
 }
 
-/// Settings > About. Documents the exact two hosts the app talks to, by name
-/// and purpose, next to the human behind it and the support address (§12).
+/// Settings > About. Documents the exact hosts the app talks to, by name and
+/// purpose, next to the human behind it and the support address (§12). The
+/// free edition lists the license host too, marked as not used, so the list
+/// stays truthful without hiding anything.
 struct AboutSection: View {
     @EnvironmentObject var updates: UpdateManager
     let config: AppConfig
+    let edition: Edition
     let onPrivacySheet: () -> Void
     let onProtections: () -> Void
     let onAcknowledgements: () -> Void
@@ -74,11 +77,10 @@ struct AboutSection: View {
                 .buttonStyle(.link)
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text("Network: exactly two hosts").font(.system(size: 12, weight: .semibold))
+                Text(Self.networkHeading(edition: edition)).font(.system(size: 12, weight: .semibold))
                 endpoint(config.updateHost,
                          "Update check: fetches the signed appcast once a day, and an update only after you approve it.")
-                endpoint(config.licenseHost,
-                         "License service: activates and re-checks your license, and relays localised prices for the plan cards.")
+                endpoint(config.licenseHost, Self.licenseHostPurpose(edition: edition))
                 Text("Nothing else. Your file list never leaves this Mac.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
@@ -102,6 +104,23 @@ struct AboutSection: View {
                 Spacer()
                 Button("Acknowledgements") { onAcknowledgements() }
             }
+        }
+    }
+
+    static func networkHeading(edition: Edition) -> String {
+        switch edition {
+        case .free: return "Network: one host in this edition"
+        case .licensed: return "Network: exactly two hosts"
+        }
+    }
+
+    /// The license host stays on the list in both editions; only its use changes.
+    static func licenseHostPurpose(edition: Edition) -> String {
+        switch edition {
+        case .free:
+            return "License service: not used in this edition."
+        case .licensed:
+            return "License service: activates and re-checks your license, and relays localised prices for the plan cards."
         }
     }
 

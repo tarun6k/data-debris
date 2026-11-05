@@ -1,10 +1,10 @@
 # Terms of Use
 
-**Data Debris** — last updated 14 September 2026. The current version lives at datadebris.app/terms.
+**Data Debris** — last updated 6 November 2026. The current version lives at datadebris.app/terms.
 
 ## The product
 
-Data Debris is a disk-space cleaner for macOS. Scanning and viewing results are free without limits. Cleaning, Auto Clean and Duplicates require a paid plan: 1 Year ($20) or 3 Years ($50), each covering 2 Macs.
+Data Debris is a disk-space cleaner for macOS. Scanning and viewing results are free without limits. During the beta every feature is free, and a paid plan for Cleaning, Auto Clean and Duplicates is planned for version 1.0: 1 Year ($20) or 3 Years ($50), each covering 2 Macs.
 
 ## Purchases and refunds
 
