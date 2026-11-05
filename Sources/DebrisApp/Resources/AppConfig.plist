@@ -6,6 +6,9 @@
   Nothing here is secret (Paddle tokens and price ids stay in .env / Info.plist).
   Debug builds may override LicenseWorkerURL with LICENSE_WORKER_URL in the
   repo .env, e.g. to point at a deployed sandbox worker.
+  PurchasesEnabled picks the edition: false ships the free edition (every
+  feature unlocked, no purchase flow, the license service never contacted);
+  true is the licensed edition planned for 1.0.
 -->
 <dict>
 	<key>Debug</key>
@@ -26,6 +29,8 @@
 		<string>http://127.0.0.1:8787</string>
 		<key>SupportEmail</key>
 		<string>support@datadebris.app</string>
+		<key>PurchasesEnabled</key>
+		<false/>
 	</dict>
 	<key>Release</key>
 	<dict>
@@ -45,6 +50,8 @@
 		<string>https://license.datadebris.app</string>
 		<key>SupportEmail</key>
 		<string>support@datadebris.app</string>
+		<key>PurchasesEnabled</key>
+		<false/>
 	</dict>
 </dict>
 </plist>

@@ -21,6 +21,8 @@ final class AppConfigTests: XCTestCase {
             XCTAssertEqual(config.updateFeedURL.absoluteString,
                            "https://updates.datadebris.app/appcast.xml")
             XCTAssertEqual(config.supportEmail, "support@datadebris.app")
+            // The beta ships the free edition in both configurations.
+            XCTAssertEqual(config.edition, .free)
         }
         // Debug talks to `wrangler dev` and the sandbox portal; Release to production.
         XCTAssertEqual(debug.licenseWorkerURL.host, "127.0.0.1")
@@ -97,5 +99,31 @@ final class AppConfigTests: XCTestCase {
         XCTAssertThrowsError(try AppConfig.load(variant: .release, bundle: Bundle(for: XCTestCase.self))) {
             XCTAssertEqual($0 as? AppConfig.LoadError, .missingResource)
         }
+    }
+
+    /// PurchasesEnabled is required and must be a real boolean: a missing key
+    /// or a "false" string must not silently ship the licensed edition.
+    func testPurchasesEnabledIsRequiredAndMustBeABoolean() throws {
+        var plist: [String: Any] = [
+            "PrivacyPolicyURL": "https://example.test/p", "TermsURL": "https://example.test/t",
+            "SecurityURL": "https://example.test/s", "CustomerPortalURL": "https://example.test/c",
+            "UpdateHost": "u.example.test", "UpdateFeedURL": "https://u.example.test/appcast.xml",
+            "LicenseWorkerURL": "https://l.example.test", "SupportEmail": "support@example.test",
+        ]
+        XCTAssertThrowsError(try AppConfig(plist: plist)) {
+            XCTAssertEqual($0 as? AppConfig.LoadError, .missingKey("PurchasesEnabled"))
+        }
+        for wrong: Any in ["false", 1, 0] {
+            plist["PurchasesEnabled"] = wrong
+            XCTAssertThrowsError(try AppConfig(plist: plist), "\(wrong)") {
+                XCTAssertEqual($0 as? AppConfig.LoadError, .badValue("PurchasesEnabled"))
+            }
+        }
+        plist["PurchasesEnabled"] = false
+        XCTAssertEqual(try AppConfig(plist: plist).edition, .free)
+        plist["PurchasesEnabled"] = true
+        XCTAssertEqual(try AppConfig(plist: plist).edition, .licensed)
+        XCTAssertEqual(Edition(purchasesEnabled: false), .free)
+        XCTAssertEqual(Edition(purchasesEnabled: true), .licensed)
     }
 }

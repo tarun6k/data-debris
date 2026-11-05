@@ -1,5 +1,20 @@
 import Foundation
 
+/// Which edition this build is. Decided once at launch from the
+/// PurchasesEnabled key in AppConfig.plist and handed to AppModel; nothing
+/// else reads the key. `.free` ships every feature unlocked, with no purchase
+/// flow and no contact with the license service. `.licensed` is the 1.0 path:
+/// Entitlements gate Clean, Auto Clean and Duplicates behind a license.
+/// The safety invariants S1–S10 do not depend on the edition.
+enum Edition: Equatable {
+    case free
+    case licensed
+
+    init(purchasesEnabled: Bool) {
+        self = purchasesEnabled ? .licensed : .free
+    }
+}
+
 /// The one place for every URL and hostname the app shows or calls: the
 /// legal pages, Paddle's customer portal, the update feed host and the
 /// license worker. Read from Resources/AppConfig.plist, which carries a
@@ -16,6 +31,8 @@ struct AppConfig: Equatable {
         case missingVariant(String)
         case missingKey(String)
         case badURL(String)
+        /// Present but not the expected type (PurchasesEnabled must be a Bool).
+        case badValue(String)
     }
 
     var privacyPolicyURL: URL
@@ -29,6 +46,8 @@ struct AppConfig: Equatable {
     var licenseWorkerURL: URL
     /// Where "Report a problem" and About send people.
     var supportEmail: String
+    /// From PurchasesEnabled; the only place the key is read is init(plist:).
+    var edition: Edition
 
     /// The second hostname the privacy sheet promises ("a license check").
     var licenseHost: String {
@@ -83,11 +102,20 @@ struct AppConfig: Equatable {
         licenseWorkerURL = try url("LicenseWorkerURL")
         supportEmail = try string("SupportEmail")
         guard supportEmail.contains("@") else { throw LoadError.badURL("SupportEmail") }
+        guard let purchases = plist["PurchasesEnabled"] else {
+            throw LoadError.missingKey("PurchasesEnabled")
+        }
+        // NSNumber bridges <true/>/<false/> to Bool; an <integer> or <string>
+        // in that slot is a mistake, not a configuration.
+        guard let number = purchases as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else {
+            throw LoadError.badValue("PurchasesEnabled")
+        }
+        edition = Edition(purchasesEnabled: number.boolValue)
     }
 
     init(privacyPolicyURL: URL, termsURL: URL, securityURL: URL, customerPortalURL: URL,
          updateHost: String, updateFeedURL: URL? = nil, licenseWorkerURL: URL,
-         supportEmail: String = "support@example.test") {
+         supportEmail: String = "support@example.test", edition: Edition = .licensed) {
         self.privacyPolicyURL = privacyPolicyURL
         self.termsURL = termsURL
         self.securityURL = securityURL
@@ -96,5 +124,6 @@ struct AppConfig: Equatable {
         self.updateFeedURL = updateFeedURL ?? URL(string: "https://\(updateHost)/appcast.xml")!
         self.licenseWorkerURL = licenseWorkerURL
         self.supportEmail = supportEmail
+        self.edition = edition
     }
 }
