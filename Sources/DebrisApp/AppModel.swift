@@ -28,8 +28,13 @@ final class AppModel: ObservableObject {
     let catalogue: Catalogue
     private let autoCleanConfigURL: URL?
     private let launchAgents: LaunchAgentManager
+    /// Free or licensed, fixed for the process (AppModel.live reads it from
+    /// AppConfig once). Every purchase gate and every license-service call
+    /// checks it first; `.free` never creates a LicenseClient.
+    let edition: Edition
     let licenseStore: LicenseStore
     let entitlements: Entitlements
+    /// nil in the free edition: no client is built and no request is made.
     let licenseService: LicenseService?
     let privacyText: PrivacySheetText
     /// Every licensing timestamp (validation stamps, poll deadlines, the
@@ -105,7 +110,7 @@ final class AppModel: ObservableObject {
     private let fdaProbe: () -> Bool
 
     init(store: FindingsStore, history: HistoryStore, exclusions: ExclusionStore,
-         catalogue: Catalogue, autoCleanConfigURL: URL? = nil,
+         catalogue: Catalogue, edition: Edition, autoCleanConfigURL: URL? = nil,
          launchAgents: LaunchAgentManager? = nil,
          licenseStore: LicenseStore? = nil,
          licenseService: LicenseService? = nil,
@@ -122,17 +127,25 @@ final class AppModel: ObservableObject {
         self.history = history
         self.exclusions = exclusions
         self.catalogue = catalogue
+        self.edition = edition
         self.autoCleanConfigURL = autoCleanConfigURL ?? (try? AutoCleanConfig.defaultFileURL())
         self.launchAgents = launchAgents ?? LaunchAgentManager()
         self.licenseStore = licenseStore ?? LicenseStore(clock: clock)
         self.entitlements = Entitlements(store: self.licenseStore, clock: clock)
-        self.licenseService = licenseService
-            ?? LicenseConfig.current.workerURL.map { LicenseClient(baseURL: $0) }
+        switch edition {
+        case .free:
+            // The license service is not used in this edition: no client,
+            // even when a test hands one in, so nothing can call it.
+            self.licenseService = nil
+        case .licensed:
+            self.licenseService = licenseService
+                ?? LicenseConfig.current.workerURL.map { LicenseClient(baseURL: $0) }
+        }
         self.privacyText = privacyText ?? PrivacySheetText()
         if let url = self.autoCleanConfigURL {
             autoCleanConfig = AutoCleanConfig.load(from: url).validated(against: catalogue)
         }
-        entitlementState = entitlements.state
+        if edition == .licensed { entitlementState = entitlements.state }
 
         let defaults = AppPaths.userDefaults
         let wasGranted = defaults.bool(forKey: Self.fdaWasGrantedKey)
@@ -198,6 +211,7 @@ final class AppModel: ObservableObject {
                 history: try HistoryStore(),
                 exclusions: try ExclusionStore(),
                 catalogue: try Catalogue.bundled(),
+                edition: AppConfig.current.edition, // the one read of PurchasesEnabled
                 moveDecision: MoveToApplications.current,
                 justMoved: justMoved)
             _ = try? model.history.recoverInterruptedRuns()
@@ -741,8 +755,17 @@ final class AppModel: ObservableObject {
         autoCleanConfig.privacyAcknowledgement?.textHash == privacyText.textHash
     }
 
+    /// Free edition: a no-op. The state stays .free, the license store is
+    /// never read, and the Home banners (expiring, lapsed) never appear.
     func refreshEntitlement() {
+        guard edition == .licensed else { return }
         entitlementState = entitlements.state
+    }
+
+    /// What the UI unlocks on: everything in the free edition, otherwise the
+    /// entitlement. The Review gate (S2) is unaffected either way.
+    var isEntitled: Bool {
+        edition == .free || entitlementState.isEntitled
     }
 
     // MARK: - Support
@@ -776,8 +799,10 @@ final class AppModel: ObservableObject {
 
     /// Every locked action funnels through here: allowed = proceed; otherwise
     /// the purchase flow starts and, on activation, resumes the action.
+    /// In the free edition every feature is allowed and no sheet is shown.
     @discardableResult
     func requireEntitled(_ feature: LockedFeature, toResume resume: PurchaseFlow.ResumeAction) -> Bool {
+        guard edition == .licensed else { return true }
         refreshEntitlement()
         guard entitlements.require(feature) == .needsPurchase else { return true }
         startPurchase(resuming: resume)
@@ -785,6 +810,7 @@ final class AppModel: ObservableObject {
     }
 
     func startPurchase(resuming resume: PurchaseFlow.ResumeAction = .none) {
+        guard edition == .licensed else { return } // no plan or privacy sheet in the free edition
         guard purchase == nil, cleanFlow == nil else { return }
         guard let service = licenseService else {
             licenseToast = "The license service is not configured in this build"
@@ -839,7 +865,10 @@ final class AppModel: ObservableObject {
 
     // MARK: - Settings > License
 
-    var licensePayload: EntitlementPayload? { licenseStore.load()?.0 }
+    /// nil in the free edition, so Settings never shows plan details.
+    var licensePayload: EntitlementPayload? {
+        edition == .licensed ? licenseStore.load()?.0 : nil
+    }
 
     /// "Enter a different key" in Settings. ponytail: errors surface as
     /// toasts here; the full Manage Macs list stays in the purchase flow.
@@ -925,6 +954,9 @@ final class AppModel: ObservableObject {
     /// Launch and wake: at most one validate round-trip per 24 h; the
     /// LaunchAgents follow the entitlement (no unpaid background cleaning).
     func licenseHousekeeping() {
+        // Free edition: nothing to validate, and the LaunchAgents follow the
+        // Auto Clean config alone (reconcile would remove them as unpaid).
+        guard edition == .licensed else { return }
         refreshEntitlement()
         entitlements.reconcileAutoCleanAgent(config: autoCleanConfig, agents: launchAgents)
         guard let service = licenseService else { return }

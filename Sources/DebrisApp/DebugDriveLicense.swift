@@ -53,6 +53,13 @@ extension AppModel {
     /// profile has nothing pending to save.
     private func driveQuit() -> Never { exit(0) }
 
+    /// Both routes exercise the gate and the worker, which the free edition
+    /// never touches; say so instead of reporting the open gate as a failure.
+    private func driveNotLicensedEdition() -> Never {
+        drive("SKIPPED — PurchasesEnabled is false in this build: no gate, no worker to drive")
+        driveQuit()
+    }
+
     /// Never prints a whole key.
     private func describe(_ step: PurchaseFlow.Step) -> String {
         switch step {
@@ -133,6 +140,7 @@ extension AppModel {
         let marker = args[index + 1]
         let shots = driveShotsDir(args)
         showWelcome = false
+        guard edition == .licensed else { driveNotLicensedEdition() }
 
         Task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
@@ -210,6 +218,7 @@ extension AppModel {
         let command = args[index + 1]
         let shots = driveShotsDir(args)
         showWelcome = false
+        guard edition == .licensed else { driveNotLicensedEdition() }
 
         Task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)

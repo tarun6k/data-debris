@@ -33,6 +33,7 @@ final class PurchaseFlowTests: XCTestCase {
             history: try HistoryStore(databaseURL: dir.appendingPathComponent("history.sqlite")),
             exclusions: try ExclusionStore(fileURL: dir.appendingPathComponent("exclusions.json")),
             catalogue: Catalogue(version: 1, rules: []),
+            edition: .licensed, // purchases enabled: these tests protect the 1.0 path
             autoCleanConfigURL: dir.appendingPathComponent("settings.json"),
             launchAgents: LaunchAgentManager(
                 agentsDirectory: dir.appendingPathComponent("LaunchAgents"),
